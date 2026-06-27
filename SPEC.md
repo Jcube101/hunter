@@ -23,91 +23,51 @@
 
 ## Repository Layout
 
-hunter/                          ← repo root
-
-frontend/
-
-src/
-
-components/                ← React UI components
-
-StartScreen.jsx
-
-EndScreen.jsx
-
-PauseScreen.jsx
-
-Minimap.jsx
-
-HUD.jsx                  ← score + timer overlay
-
-hooks/
-
-useGameLoop.js           ← requestAnimationFrame loop
-
-useBoids.js              ← simulation state + update logic
-
-useInput.js              ← mouse + touch unified input
-
-useSound.js              ← Tone.js audio management
-
-useFullscreen.js         ← Fullscreen API + orientation lock
-
-constants/
-
-boids.js                 ← ALL tuning parameters (see GDD.md)
-
-theme.js                 ← Ocean color palette + sprite config
-
-game/
-
-boids.js                 ← Boids update functions (pure JS, no React)
-
-renderer.js              ← Canvas draw functions
-
-particles.js             ← Particle system
-
-camera.js                ← Camera/viewport transform
-
-App.jsx                    ← Screen router (start → game → end)
-
-main.jsx
-
-public/
-
-favicon.ico
-
-index.html
-
-vite.config.js
-
-tailwind.config.js
-
-package.json
-
-backend/
-
-main.py                      ← FastAPI app
-
-leaderboard.db               ← SQLite (gitignored, auto-created)
-
-hunter.service               ← systemd unit
-
-requirements.txt
-
-CLAUDE.md
-
-GDD.md
-
-SPEC.md
-
-README.md
-
-ROADMAP.md
-
-CONTRIBUTING.md
-
-.gitignore
+```text
+hunter/                              ← repo root
+    frontend/
+        src/
+            components/              ← React UI components
+                StartScreen.jsx
+                EndScreen.jsx
+                PauseScreen.jsx
+                Minimap.jsx
+                HUD.jsx              ← score + timer overlay
+            hooks/
+                useGameLoop.js       ← requestAnimationFrame loop
+                useBoids.js          ← simulation state + update logic
+                useInput.js          ← mouse + touch unified input
+                useSound.js          ← Tone.js audio management
+                useFullscreen.js     ← Fullscreen API + orientation lock
+            constants/
+                boids.js             ← ALL tuning parameters (see GDD.md)
+                theme.js             ← Ocean color palette + sprite config
+            game/
+                boids.js             ← Boids update functions (pure JS, no React)
+                renderer.js          ← Canvas draw functions
+                particles.js         ← Particle system
+                camera.js            ← Camera/viewport transform
+            App.jsx                  ← Screen router (start → game → end)
+            main.jsx
+        public/
+            favicon.ico
+        index.html
+        vite.config.js
+        tailwind.config.js
+        package.json
+    backend/
+        main.py                      ← FastAPI app
+        leaderboard.db               ← SQLite (gitignored, auto-created)
+        hunter.service               ← systemd unit
+        requirements.txt
+    CLAUDE.md
+    GDD.md
+    SPEC.md
+    README.md
+    ROADMAP.md
+    CONTRIBUTING.md
+    .gitignore
+```
 
 ---
 
@@ -192,11 +152,11 @@ CORSMiddleware. Do not add it.
 
 ### Python Dependencies
 
+```text
 fastapi
-
 uvicorn[standard]
-
 pydantic
+```
 
 No ORM. Raw sqlite3 (stdlib). No SQLAlchemy.
 
@@ -280,7 +240,7 @@ No authentication. No rate limiting in v1.
 { "status": "ok" }
 ```
 
-Used by systemd readiness check and manual verification after deploy.
+Used for manual verification after deploy and external monitoring (e.g. UptimeRobot).
 
 ---
 
@@ -346,17 +306,14 @@ No cookies. No session storage. No IndexedDB.
 
 ### Workflow
 
+```text
 Write code on Pi (VS Code)
-
-→ git push
-
-→ git pull on Windows (optional)
-
-→ npm run build (frontend)
-
-→ sudo systemctl restart hunter
-
-→ curl /api/health to verify
+  → git push
+  → git pull on Windows (optional)
+  → npm run build (frontend)
+  → sudo systemctl restart hunter
+  → curl /api/health to verify
+```
 
 ---
 

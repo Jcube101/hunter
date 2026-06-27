@@ -36,31 +36,21 @@ Two themes share identical physics. Only sprites, colors, and particles differ.
 
 ## Game Loop
 
+```text
 Start Screen
-
-→ Theme select (Ocean locked in v1)
-
-→ Tap Play
-
-→ Fullscreen + landscape lock
-
-→ 60 second timer begins
-
-→ Player hunts prey
-
-→ Catch prey → score + particle burst
-
-→ Timer hits 0:00 OR all prey caught → game ends
-
-→ End Screen
-
-→ Score displayed
-
-→ Personal best check (localStorage)
-
-→ If new PB → "Add to leaderboard?" prompt
-
-→ Play Again
+  → Theme select (Ocean locked in v1)
+  → Tap Play
+  → Fullscreen + landscape lock
+  → 60 second timer begins
+  → Player hunts prey
+  → Catch prey → score + particle burst
+  → Timer hits 0:00 OR all prey caught → game ends
+  → End Screen
+      → Score displayed
+      → Personal best check (localStorage)
+      → If new PB → "Add to leaderboard?" prompt
+  → Play Again
+```
 
 ---
 
@@ -157,7 +147,7 @@ Never hardcode these values inline anywhere else.
 - **Mobile:** Touch position = target. Predator moves toward finger.
 - **Offset (mobile):** Predator renders ~80px above the touch point so the
   player's finger never obscures the predator or its catch zone.
-- **Speed:** 4.5 px/frame. Faster than prey base speed but not flee speed —
+- **Speed:** 3.8 px/frame. Faster than prey base speed but not flee speed —
   player must be tactical, not just fast.
 - **Edge:** Hard stop at world boundary.
 
@@ -259,7 +249,7 @@ Never hardcode these values inline anywhere else.
 
 ### Schema
 ```sql
-CREATE TABLE leaderboard (
+CREATE TABLE IF NOT EXISTS leaderboard (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     score INTEGER NOT NULL,
@@ -278,9 +268,11 @@ CREATE TABLE leaderboard (
 7. If not new PB or player skips: nothing is sent. Ever.
 
 ### API Endpoints
-GET  /api/leaderboard         → top 10 scores [{name, score, theme, created_at}]
 
-POST /api/leaderboard         → {name, score, theme} → 201 on success
+```text
+GET  /api/leaderboard    → top 10 scores [{name, score, theme, created_at}]
+POST /api/leaderboard    → {name, score, theme} → 201 on success
+```
 
 Top 10 only. No pagination. No delete. No auth.
 
@@ -313,7 +305,7 @@ together after playtesting.
 | `FISH_COUNT_DESKTOP` | 50 | |
 | `FISH_BASE_SPEED` | 2.5 | px/frame |
 | `FISH_FLEE_SPEED` | 4.0 | px/frame — at predator contact |
-| `SHARK_SPEED` | 4.5 | px/frame |
+| `SHARK_SPEED` | 3.8 | px/frame |
 | `FLEE_RADIUS` | 120 | px — fish notice predator within this |
 | `FLEE_WEIGHT` | 3.0 | Dominates all other forces |
 | `SEPARATION_RADIUS` | 25 | px |
