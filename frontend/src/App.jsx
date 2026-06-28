@@ -33,7 +33,8 @@ import {
   WORLD_WIDTH_MULTIPLIER,
   WORLD_HEIGHT_MULTIPLIER,
   GAME_DURATION,
-  DIFFICULTY_SPEEDS,
+  SHARK_SPEED,
+  DIFFICULTY_SETTINGS,
   DEFAULT_DIFFICULTY,
   HITBOX_RADIUS,
   SHARK_MOUTH_OFFSET,
@@ -55,18 +56,19 @@ export default function App() {
     setScreen(s)
   }, [])
 
-  // Difficulty (shark speed only). Persisted; locked into sharkSpeedRef at game
-  // start so it can't change mid-game.
+  // Difficulty scales fish flee behavior (not shark speed). Persisted; the flee
+  // settings are locked into fleeSettingsRef at game start so they can't change
+  // mid-game.
   const [difficulty, setDifficulty] = useState(() => {
     const stored = localStorage.getItem(DIFFICULTY_KEY)
-    return stored && DIFFICULTY_SPEEDS[stored] ? stored : DEFAULT_DIFFICULTY
+    return stored && DIFFICULTY_SETTINGS[stored] ? stored : DEFAULT_DIFFICULTY
   })
   const selectDifficulty = useCallback((d) => {
-    if (!DIFFICULTY_SPEEDS[d]) return
+    if (!DIFFICULTY_SETTINGS[d]) return
     setDifficulty(d)
     localStorage.setItem(DIFFICULTY_KEY, d)
   }, [])
-  const sharkSpeedRef = useRef(DIFFICULTY_SPEEDS[DEFAULT_DIFFICULTY])
+  const fleeSettingsRef = useRef(DIFFICULTY_SETTINGS[DEFAULT_DIFFICULTY])
 
   // Canvas + minimap elements
   const canvasRef = useRef(null)
@@ -138,8 +140,8 @@ export default function App() {
     if (input && input.isJoystick) {
       // Joystick (mobile): velocity ∝ stick displacement. |dx,dy| in [0,1], so
       // the shark crawls near center and hits full speed at the rim.
-      vx = input.dx * sharkSpeedRef.current * dt
-      vy = input.dy * sharkSpeedRef.current * dt
+      vx = input.dx * SHARK_SPEED * dt
+      vy = input.dy * SHARK_SPEED * dt
     } else {
       // Mouse (desktop): move toward the world-space target, never overshoot.
       const target = input || { x: p.x, y: p.y }
@@ -147,7 +149,7 @@ export default function App() {
       const dy = target.y - p.y
       const dist = Math.hypot(dx, dy)
       if (dist > 0) {
-        const step = Math.min(sharkSpeedRef.current * dt, dist)
+        const step = Math.min(SHARK_SPEED * dt, dist)
         vx = (dx / dist) * step
         vy = (dy / dist) * step
       }
@@ -169,7 +171,7 @@ export default function App() {
   // dt = frame-normalized delta (motion), dtSeconds = wall-clock (timer).
   const onFrameUpdate = useCallback((dt, dtSeconds) => {
     movePredator(dt)
-    tickBoids(dt)
+    tickBoids(dt, fleeSettingsRef.current.FLEE_WEIGHT, fleeSettingsRef.current.FLEE_RADIUS)
 
     cameraRef.current = updateCamera(predatorRef.current, worldRef.current, viewportRef.current)
 
@@ -259,10 +261,11 @@ export default function App() {
 
   // --- Game lifecycle --------------------------------------------------------
   const startGame = useCallback(async () => {
-    soundRef.current.playAmbient() // unlock audio inside the Play gesture, start drone
+    soundRef.current.playAmbient() // unlock audio inside the Play gesture, start ambient
 
-    // Lock the difficulty speed for this game (selector is start-screen only).
-    sharkSpeedRef.current = DIFFICULTY_SPEEDS[difficulty]
+    // Lock the difficulty's fish-flee settings for this game (selector is
+    // start-screen only). Shark speed is constant (SHARK_SPEED) in all modes.
+    fleeSettingsRef.current = DIFFICULTY_SETTINGS[difficulty]
 
     await enter() // fullscreen + landscape lock (best effort)
 
@@ -377,7 +380,9 @@ export default function App() {
         worldRef,
         cameraRef,
         inputPosRef,
-        sharkSpeedRef,
+        joystickRef,
+        fleeSettingsRef,
+        sharkSpeed: SHARK_SPEED,
       }
     }
   }, [predatorRef, fishRef, worldRef, inputPosRef])

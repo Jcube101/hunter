@@ -140,11 +140,11 @@ export function anchorForce(fish, world, weight) {
 
 // --- Speed: base, ramping up to flee speed as the predator closes in --------
 
-function maxSpeedFor(fish, predator) {
+function maxSpeedFor(fish, predator, fleeRadius) {
   if (!predator) return FISH_BASE_SPEED
   const d = Math.hypot(fish.x - predator.x, fish.y - predator.y)
-  if (d >= FLEE_RADIUS) return FISH_BASE_SPEED
-  const proximity = 1 - d / FLEE_RADIUS // 0 at edge, 1 at contact
+  if (d >= fleeRadius) return FISH_BASE_SPEED
+  const proximity = 1 - d / fleeRadius // 0 at edge, 1 at contact
   return FISH_BASE_SPEED + proximity * (FISH_FLEE_SPEED - FISH_BASE_SPEED)
 }
 
@@ -154,11 +154,21 @@ function maxSpeedFor(fish, predator) {
 // returns a NEW fish object. Does not mutate `fish`. `dt` is the frame-
 // normalized delta (~1.0 at 60Hz) so the position advance is refresh-rate
 // independent; the velocity/force constants themselves are never scaled.
-export function updateFish(fish, allFish, predator, world, dt = 1) {
+// `fleeWeight`/`fleeRadius` come from the selected difficulty (DIFFICULTY_SETTINGS)
+// and default to the Normal constants so existing callers/tests stay correct.
+export function updateFish(
+  fish,
+  allFish,
+  predator,
+  world,
+  dt = 1,
+  fleeWeight = FLEE_WEIGHT,
+  fleeRadius = FLEE_RADIUS,
+) {
   const sep = separation(fish, allFish, SEPARATION_RADIUS, SEPARATION_WEIGHT)
   const ali = alignment(fish, allFish, ALIGNMENT_RADIUS, ALIGNMENT_WEIGHT)
   const coh = cohesion(fish, allFish, COHESION_RADIUS, COHESION_WEIGHT)
-  const fle = flee(fish, predator, FLEE_RADIUS, FLEE_WEIGHT)
+  const fle = flee(fish, predator, fleeRadius, fleeWeight)
   const edge = edgeRepulsion(fish, world, EDGE_REPULSION_RADIUS, EDGE_REPULSION_WEIGHT)
   const anc = anchorForce(fish, world, ANCHOR_WEIGHT)
 
@@ -166,7 +176,9 @@ export function updateFish(fish, allFish, predator, world, dt = 1) {
   let vx = fish.vx + sep.x + ali.x + coh.x + fle.x + edge.x + anc.x
   let vy = fish.vy + sep.y + ali.y + coh.y + fle.y + edge.y + anc.y
 
-  const clamped = clampMagnitude(vx, vy, maxSpeedFor(fish, predator))
+  // Flee-speed ramp keyed to the same (difficulty) flee radius, so on Easy the
+  // school both reacts and accelerates from a closer range.
+  const clamped = clampMagnitude(vx, vy, maxSpeedFor(fish, predator, fleeRadius))
   vx = clamped.x
   vy = clamped.y
 
@@ -176,8 +188,15 @@ export function updateFish(fish, allFish, predator, world, dt = 1) {
 // Advance the whole school one tick. Returns a NEW array (no mutation), so the
 // per-fish forces all read the same pre-tick snapshot. `dt` is forwarded to
 // each fish for frame-rate-independent motion.
-export function updateSchool(fish, predator, world, dt = 1) {
-  return fish.map((f) => updateFish(f, fish, predator, world, dt))
+export function updateSchool(
+  fish,
+  predator,
+  world,
+  dt = 1,
+  fleeWeight = FLEE_WEIGHT,
+  fleeRadius = FLEE_RADIUS,
+) {
+  return fish.map((f) => updateFish(f, fish, predator, world, dt, fleeWeight, fleeRadius))
 }
 
 // --- Spawning ---------------------------------------------------------------

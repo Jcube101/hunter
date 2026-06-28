@@ -26,9 +26,17 @@ export function useBoids() {
   }, [])
 
   // Run one simulation tick using the current predator (set by App each frame).
-  // `dt` is the frame-normalized delta; returns the updated fish array.
-  const update = useCallback((dt = 1) => {
-    fishRef.current = updateSchool(fishRef.current, predatorRef.current, worldRef.current, dt)
+  // `dt` is the frame-normalized delta; `fleeWeight`/`fleeRadius` come from the
+  // selected difficulty (App locks them at game start). Returns the updated array.
+  const update = useCallback((dt = 1, fleeWeight, fleeRadius) => {
+    fishRef.current = updateSchool(
+      fishRef.current,
+      predatorRef.current,
+      worldRef.current,
+      dt,
+      fleeWeight,
+      fleeRadius,
+    )
     return fishRef.current
   }, [])
 
