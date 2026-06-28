@@ -33,11 +33,11 @@ export const COHESION_RADIUS = 100 // px
 export const COHESION_WEIGHT = 1.4
 
 // --- Anchor (weak constant pull toward world center; applied every frame) ---
-export const ANCHOR_WEIGHT = 0.05 // intentionally subtle — prevents permanent exile to corners
+export const ANCHOR_WEIGHT = 0.02 // very subtle — was 0.05, too strong (school clumped)
 
 // --- Edge repulsion (turn away from world boundary) ---
-export const EDGE_REPULSION_RADIUS = 80 // px from world boundary
-export const EDGE_REPULSION_WEIGHT = 2.0
+export const EDGE_REPULSION_RADIUS = 120 // px from world boundary — start turning earlier
+export const EDGE_REPULSION_WEIGHT = 3.0 // avoid walls aggressively (compensates weaker anchor)
 
 // --- Catch detection ---
 export const HITBOX_RADIUS = 8 // px — fish catch detection
@@ -46,8 +46,8 @@ export const HITBOX_RADIUS = 8 // px — fish catch detection
 export const SHARK_OFFSET_MOBILE = 80 // px above touch point
 
 // --- World sizing (× device viewport, fixed at game start) ---
-export const WORLD_WIDTH_MULTIPLIER = 1.6
-export const WORLD_HEIGHT_MULTIPLIER = 1.4
+export const WORLD_WIDTH_MULTIPLIER = 1.3
+export const WORLD_HEIGHT_MULTIPLIER = 1.2
 
 // --- Timing ---
 export const GAME_DURATION = 60 // seconds

@@ -315,13 +315,13 @@ brief reason (see CONTRIBUTING.md "Tuning Discipline").
 | `ALIGNMENT_WEIGHT` | 1.0 | |
 | `COHESION_RADIUS` | 100 | px — wider cohesion pull (from 80) |
 | `COHESION_WEIGHT` | 1.4 | School should regroup after scatter, not stay dispersed (from 1.0) |
-| `ANCHOR_WEIGHT` | 0.05 | Weak center-pull — prevents school permanently exiling to world corners after scatter |
-| `EDGE_REPULSION_RADIUS` | 80 | px from world boundary |
-| `EDGE_REPULSION_WEIGHT` | 2.0 | |
+| `ANCHOR_WEIGHT` | 0.02 | Weak center-pull — lowered from 0.05 (too strong, school clumped unnaturally) |
+| `EDGE_REPULSION_RADIUS` | 120 | px from world boundary — raised from 80 so fish turn earlier, stay central |
+| `EDGE_REPULSION_WEIGHT` | 3.0 | Raised from 2.0 to compensate for weaker anchor — fish avoid walls more aggressively | |
 | `HITBOX_RADIUS` | 8 | px — fish catch detection |
 | `SHARK_OFFSET_MOBILE` | 80 | px above touch point |
-| `WORLD_WIDTH_MULTIPLIER` | 1.6 | × viewport width (reduced from 2.5 — world too large, fish scattered permanently off-screen) |
-| `WORLD_HEIGHT_MULTIPLIER` | 1.4 | × viewport height (reduced from 2.0 — same) |
+| `WORLD_WIDTH_MULTIPLIER` | 1.3 | × viewport width (reduced 2.5 → 1.6 → 1.3 — less off-screen territory for fish to flee into) |
+| `WORLD_HEIGHT_MULTIPLIER` | 1.2 | × viewport height (reduced 2.0 → 1.4 → 1.2 — same) |
 | `GAME_DURATION` | 60 | seconds |
 | `LOW_TIME_THRESHOLD` | 10 | seconds — timer turns red |
 | `GRACE_PERIOD` | 2000 | ms — catch disabled at game start to prevent spawn kills |
