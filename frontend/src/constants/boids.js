@@ -49,7 +49,11 @@ export const EDGE_REPULSION_RADIUS = 120 // px from world boundary — start tur
 export const EDGE_REPULSION_WEIGHT = 3.0 // avoid walls aggressively (compensates weaker anchor)
 
 // --- Catch detection ---
-export const HITBOX_RADIUS = 8 // px — fish catch detection
+// Coordinates are all CSS-pixel world space (no DPR factor anywhere in the
+// catch check), so the hitbox is honest. Raised 8 → 12: at 60Hz the mouth and a
+// fleeing fish close at up to ~7.8px/frame, so an 8px radius could tunnel past a
+// visually-overlapping fish in a single frame. 12px restores reliable catches.
+export const HITBOX_RADIUS = 12 // px — fish catch detection
 
 // --- Mobile input: fixed virtual joystick, bottom-left (see GDD "Controls").
 //     Direction + speed both come from stick displacement. ---

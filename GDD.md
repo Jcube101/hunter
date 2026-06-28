@@ -178,9 +178,12 @@ Never hardcode these values inline anywhere else.
 
 ### Catch Mechanic
 - Predator has a defined **mouth point** at its front tip
-- Each fish has a **hitbox radius of 8px** centered on its position
+- Each fish has a **hitbox radius of 12px** centered on its position
 - Every frame: check Euclidean distance from mouth point to each fish center
-- If distance < 8px → catch triggered
+- If distance < 12px → catch triggered
+- All catch math is in CSS-pixel world space — `devicePixelRatio` is applied
+  only to the canvas backing store and draw transform, never to simulation
+  coordinates, so the hitbox is the same physical size on HiDPI displays
 
 ### On Catch
 1. Fish removed from simulation immediately
@@ -339,7 +342,7 @@ brief reason (see CONTRIBUTING.md "Tuning Discipline").
 | `ANCHOR_WEIGHT` | 0.02 | Weak center-pull — lowered from 0.05 (too strong, school clumped unnaturally) |
 | `EDGE_REPULSION_RADIUS` | 120 | px from world boundary — raised from 80 so fish turn earlier, stay central |
 | `EDGE_REPULSION_WEIGHT` | 3.0 | Raised from 2.0 to compensate for weaker anchor — fish avoid walls more aggressively | |
-| `HITBOX_RADIUS` | 8 | px — fish catch detection |
+| `HITBOX_RADIUS` | 12 | px — fish catch detection (raised from 8: prevents single-frame tunnelling past a fish at high closing speed) |
 | `SHARK_OFFSET_MOBILE` | 80 | px above touch point |
 | `WORLD_WIDTH_MULTIPLIER` | 1.3 | × viewport width (reduced 2.5 → 1.6 → 1.3 — less off-screen territory for fish to flee into) |
 | `WORLD_HEIGHT_MULTIPLIER` | 1.2 | × viewport height (reduced 2.0 → 1.4 → 1.2 — same) |
