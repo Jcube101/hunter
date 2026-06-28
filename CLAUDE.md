@@ -136,7 +136,9 @@ For local dev, the Vite proxy config in vite.config.js points /api → localhost
   PIDs on ports 5173 and 8013. Never run a broad process sweep — other
   Pi services (ports 8001–8012) are systemd-managed and will auto-recover
   but a sweep is careless.
-
+- **Never remove frontend/dist/** — the live service serves this directory 
+  directly. Removing it takes production down immediately. dist/ is gitignored 
+  but must remain on disk. Rebuild in place with npm run build, never rm -rf dist/.
 ---
 
 ## Verification Steps (run after every deploy)
