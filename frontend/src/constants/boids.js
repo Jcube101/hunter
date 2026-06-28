@@ -51,8 +51,14 @@ export const EDGE_REPULSION_WEIGHT = 3.0 // avoid walls aggressively (compensate
 // --- Catch detection ---
 export const HITBOX_RADIUS = 8 // px — fish catch detection
 
-// --- Mobile input ---
-export const SHARK_OFFSET_MOBILE = 80 // px above touch point
+// --- Mobile input: fixed virtual joystick, bottom-left (see GDD "Controls").
+//     Direction + speed both come from stick displacement. ---
+export const SHARK_OFFSET_MOBILE = 80 // px above touch point (legacy; pre-joystick)
+export const JOYSTICK_RADIUS = 60 // px — max knob displacement from base center (= full speed)
+export const JOYSTICK_BASE_X = JOYSTICK_RADIUS + 20 // px from left edge to base center
+export const JOYSTICK_BASE_Y = JOYSTICK_RADIUS + 20 // px from bottom edge to base center
+export const JOYSTICK_ACTIVATE_RADIUS = 80 // px — touch within this of base center grabs the stick
+export const JOYSTICK_KNOB_RADIUS = 20 // px — drawn knob radius
 
 // --- World sizing (× device viewport, fixed at game start) ---
 export const WORLD_WIDTH_MULTIPLIER = 1.3

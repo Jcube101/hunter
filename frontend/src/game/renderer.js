@@ -5,7 +5,13 @@
 // worldToScreen. The minimap is drawn on its own separate canvas.
 
 import { worldToScreen } from './camera.js'
-import { SHARK_MOUTH_OFFSET } from '../constants/boids.js'
+import {
+  SHARK_MOUTH_OFFSET,
+  JOYSTICK_BASE_X,
+  JOYSTICK_BASE_Y,
+  JOYSTICK_RADIUS,
+  JOYSTICK_KNOB_RADIUS,
+} from '../constants/boids.js'
 
 // Heading helper: prefer an explicit angle (predator uses one with a jitter
 // threshold), else derive from velocity.
@@ -107,6 +113,29 @@ export function drawShark(ctx, predator, camera, theme) {
   ctx.fill()
 
   ctx.restore()
+}
+
+// Virtual joystick overlay (mobile only). Drawn in SCREEN space, so the caller
+// must invoke it with the base HiDPI transform set (no camera offset). The base
+// ring sits fixed bottom-left; the knob rides the stick's clamped displacement.
+export function drawJoystick(ctx, joystick, viewport) {
+  const cx = JOYSTICK_BASE_X
+  const cy = viewport.height - JOYSTICK_BASE_Y
+
+  // Base ring — always visible during gameplay, semi-transparent.
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(cx, cy, JOYSTICK_RADIUS, 0, Math.PI * 2)
+  ctx.stroke()
+
+  // Knob — offset by the (clamped) displacement when active, centered at rest.
+  const kx = cx + (joystick?.active ? joystick.dx : 0)
+  const ky = cy + (joystick?.active ? joystick.dy : 0)
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'
+  ctx.beginPath()
+  ctx.arc(kx, ky, JOYSTICK_KNOB_RADIUS, 0, Math.PI * 2)
+  ctx.fill()
 }
 
 // Minimap on its own small canvas. Reads its size from ctx.canvas. Shows the

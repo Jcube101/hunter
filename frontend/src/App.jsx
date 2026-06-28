@@ -23,7 +23,7 @@ import { useGameLoop } from './hooks/useGameLoop.js'
 import { useSound } from './hooks/useSound.js'
 
 import { updateCamera } from './game/camera.js'
-import { drawBackground, drawFish, drawShark, drawMinimap } from './game/renderer.js'
+import { drawBackground, drawFish, drawShark, drawMinimap, drawJoystick } from './game/renderer.js'
 import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
 import { theme } from './constants/theme.js'
 import {
@@ -98,7 +98,7 @@ export default function App() {
   const [endData, setEndData] = useState({ score: 0, personalBest: 0, isNewPB: false })
 
   // Input + fullscreen
-  const { inputPosRef } = useInput(canvasRef, cameraRef)
+  const { inputPosRef, joystickRef } = useInput(canvasRef, cameraRef)
   const handleFullscreenExit = useCallback(() => {
     // System/back-gesture fullscreen exit during play -> pause.
     if (stateRef.current === 'playing') pauseGame()
@@ -131,20 +131,26 @@ export default function App() {
   const movePredator = useCallback((dt) => {
     const p = predatorRef.current
     const world = worldRef.current
-    const target = inputPosRef.current || { x: p.x, y: p.y }
-
-    const dx = target.x - p.x
-    const dy = target.y - p.y
-    const dist = Math.hypot(dx, dy)
+    const input = inputPosRef.current
 
     let vx = 0
     let vy = 0
-    if (dist > 0) {
-      // Frame-normalized step so the shark covers its (difficulty-set) speed per
-      // 60Hz frame regardless of refresh rate; never overshoot the target.
-      const step = Math.min(sharkSpeedRef.current * dt, dist)
-      vx = (dx / dist) * step
-      vy = (dy / dist) * step
+    if (input && input.isJoystick) {
+      // Joystick (mobile): velocity ∝ stick displacement. |dx,dy| in [0,1], so
+      // the shark crawls near center and hits full speed at the rim.
+      vx = input.dx * sharkSpeedRef.current * dt
+      vy = input.dy * sharkSpeedRef.current * dt
+    } else {
+      // Mouse (desktop): move toward the world-space target, never overshoot.
+      const target = input || { x: p.x, y: p.y }
+      const dx = target.x - p.x
+      const dy = target.y - p.y
+      const dist = Math.hypot(dx, dy)
+      if (dist > 0) {
+        const step = Math.min(sharkSpeedRef.current * dt, dist)
+        vx = (dx / dist) * step
+        vy = (dy / dist) * step
+      }
     }
 
     let nx = p.x + vx
@@ -236,12 +242,18 @@ export default function App() {
     drawParticles(ctx, particlesRef.current, cam)
     ctx.restore()
 
+    // Virtual joystick overlay — mobile only, screen-space (after shake restore
+    // so it never jitters). Base transform still carries the HiDPI scale.
+    if (vp.width < MOBILE_BREAKPOINT) {
+      drawJoystick(ctx, joystickRef.current, vp)
+    }
+
     // Minimap on its own canvas (no shake).
     const mm = minimapRef.current
     if (mm) {
       drawMinimap(mm.getContext('2d'), fishRef.current, predatorRef.current, worldRef.current, theme)
     }
-  }, [fishRef, predatorRef, worldRef])
+  }, [fishRef, predatorRef, worldRef, joystickRef])
 
   const { start, stop } = useGameLoop(onFrameUpdate, onFrameDraw)
 
