@@ -19,6 +19,7 @@ import {
   COHESION_WEIGHT,
   EDGE_REPULSION_RADIUS,
   EDGE_REPULSION_WEIGHT,
+  ANCHOR_WEIGHT,
   INITIAL_VELOCITY_RANGE,
 } from '../constants/boids.js'
 
@@ -129,6 +130,14 @@ export function edgeRepulsion(fish, world, radius, weight) {
   return { x: fx * weight, y: fy * weight }
 }
 
+// Weak constant pull toward world center, applied every frame regardless of
+// neighbors. Keeps a scattered school (or a lone exiled fish) from settling
+// permanently in a corner. Deliberately subtle — see ANCHOR_WEIGHT.
+export function anchorForce(fish, world, weight) {
+  const u = normalize(world.width / 2 - fish.x, world.height / 2 - fish.y)
+  return { x: u.x * weight, y: u.y * weight }
+}
+
 // --- Speed: base, ramping up to flee speed as the predator closes in --------
 
 function maxSpeedFor(fish, predator) {
@@ -151,10 +160,11 @@ export function updateFish(fish, allFish, predator, world, dt = 1) {
   const coh = cohesion(fish, allFish, COHESION_RADIUS, COHESION_WEIGHT)
   const fle = flee(fish, predator, FLEE_RADIUS, FLEE_WEIGHT)
   const edge = edgeRepulsion(fish, world, EDGE_REPULSION_RADIUS, EDGE_REPULSION_WEIGHT)
+  const anc = anchorForce(fish, world, ANCHOR_WEIGHT)
 
   // Forces act as acceleration on the existing velocity (inertia = smoothing).
-  let vx = fish.vx + sep.x + ali.x + coh.x + fle.x + edge.x
-  let vy = fish.vy + sep.y + ali.y + coh.y + fle.y + edge.y
+  let vx = fish.vx + sep.x + ali.x + coh.x + fle.x + edge.x + anc.x
+  let vy = fish.vy + sep.y + ali.y + coh.y + fle.y + edge.y + anc.y
 
   const clamped = clampMagnitude(vx, vy, maxSpeedFor(fish, predator))
   vx = clamped.x

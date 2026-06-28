@@ -128,6 +128,14 @@ For local dev, the Vite proxy config in vite.config.js points /api → localhost
 - **No CORS config needed** — frontend and API share the same origin
   (hunter.job-joseph.com). Do not add CORSMiddleware.
 - **No authentication** — this is a public game. No Cloudflare Access.
+- **window.__hunter dev hook** — exists in App.jsx, gated behind
+  `import.meta.env.DEV`. Exposes fishRef, predatorRef, scoreRef,
+  timeLeftRef, gameState for Playwright sessions. Never appears in
+  production builds.
+- **Process cleanup** — when stopping dev servers, kill only the specific
+  PIDs on ports 5173 and 8013. Never run a broad process sweep — other
+  Pi services (ports 8001–8012) are systemd-managed and will auto-recover
+  but a sweep is careless.
 
 ---
 

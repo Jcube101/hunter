@@ -37,14 +37,14 @@ hunter/                              ← repo root
                 useGameLoop.js       ← requestAnimationFrame loop
                 useBoids.js          ← simulation state + update logic
                 useInput.js          ← mouse + touch unified input
-                useSound.js          ← Tone.js audio management
+                useSound.js          ← Tone.js audio management  # stub only — implemented in Session 3
                 useFullscreen.js     ← Fullscreen API + orientation lock
             constants/
                 boids.js             ← ALL tuning parameters (see GDD.md)
                 theme.js             ← Ocean color palette + sprite config
             game/
                 boids.js             ← Boids update functions (pure JS, no React)
-                renderer.js          ← Canvas draw functions
+                renderer.js          ← Canvas draw functions  # drawHUD() was removed — HUD is React (see React/Canvas boundary)
                 particles.js         ← Particle system
                 camera.js            ← Camera/viewport transform
             App.jsx                  ← Screen router (start → game → end)

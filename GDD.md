@@ -297,7 +297,8 @@ Sounds must not autoplay before user interaction (browser policy).
 ## Difficulty Parameters (Tuning Reference)
 
 All values in `frontend/src/constants/boids.js`. Adjust here and in this table
-together after playtesting.
+together after playtesting, and commit the change with a `tune:` prefix and a
+brief reason (see CONTRIBUTING.md "Tuning Discipline").
 
 | Parameter | v1 Value | Notes |
 |---|---|---|
@@ -306,20 +307,21 @@ together after playtesting.
 | `FISH_BASE_SPEED` | 2.5 | px/frame |
 | `FISH_FLEE_SPEED` | 4.0 | px/frame — at predator contact |
 | `SHARK_SPEED` | 3.8 | Lowered from 4.5 → 3.8 so fleeing fish outrun a direct chase. Design intent: intercept, don't chase. |
-| `FLEE_RADIUS` | 120 | px — fish notice predator within this |
+| `FLEE_RADIUS` | 100 | px — fish notice predator within this (tightened from 120 so the player can get closer before scatter) |
 | `FLEE_WEIGHT` | 3.0 | Dominates all other forces |
 | `SEPARATION_RADIUS` | 25 | px |
 | `SEPARATION_WEIGHT` | 1.5 | |
 | `ALIGNMENT_RADIUS` | 60 | px |
 | `ALIGNMENT_WEIGHT` | 1.0 | |
-| `COHESION_RADIUS` | 80 | px |
-| `COHESION_WEIGHT` | 1.0 | |
+| `COHESION_RADIUS` | 100 | px — wider cohesion pull (from 80) |
+| `COHESION_WEIGHT` | 1.4 | School should regroup after scatter, not stay dispersed (from 1.0) |
+| `ANCHOR_WEIGHT` | 0.05 | Weak center-pull — prevents school permanently exiling to world corners after scatter |
 | `EDGE_REPULSION_RADIUS` | 80 | px from world boundary |
 | `EDGE_REPULSION_WEIGHT` | 2.0 | |
 | `HITBOX_RADIUS` | 8 | px — fish catch detection |
 | `SHARK_OFFSET_MOBILE` | 80 | px above touch point |
-| `WORLD_WIDTH_MULTIPLIER` | 2.5 | × viewport width |
-| `WORLD_HEIGHT_MULTIPLIER` | 2.0 | × viewport height |
+| `WORLD_WIDTH_MULTIPLIER` | 1.6 | × viewport width (reduced from 2.5 — world too large, fish scattered permanently off-screen) |
+| `WORLD_HEIGHT_MULTIPLIER` | 1.4 | × viewport height (reduced from 2.0 — same) |
 | `GAME_DURATION` | 60 | seconds |
 | `LOW_TIME_THRESHOLD` | 10 | seconds — timer turns red |
 | `GRACE_PERIOD` | 2000 | ms — catch disabled at game start to prevent spawn kills |

@@ -17,7 +17,7 @@ export const FISH_FLEE_SPEED = 4.0 // at predator contact
 export const SHARK_SPEED = 3.8 // faster than base, slower than flee speed
 
 // --- Flee (predator avoidance) ---
-export const FLEE_RADIUS = 120 // px — fish notice predator within this
+export const FLEE_RADIUS = 100 // px — fish notice predator within this
 export const FLEE_WEIGHT = 3.0 // dominates all other forces
 
 // --- Separation (avoid crowding) ---
@@ -29,8 +29,11 @@ export const ALIGNMENT_RADIUS = 60 // px
 export const ALIGNMENT_WEIGHT = 1.0
 
 // --- Cohesion (drift toward group center) ---
-export const COHESION_RADIUS = 80 // px
-export const COHESION_WEIGHT = 1.0
+export const COHESION_RADIUS = 100 // px
+export const COHESION_WEIGHT = 1.4
+
+// --- Anchor (weak constant pull toward world center; applied every frame) ---
+export const ANCHOR_WEIGHT = 0.05 // intentionally subtle — prevents permanent exile to corners
 
 // --- Edge repulsion (turn away from world boundary) ---
 export const EDGE_REPULSION_RADIUS = 80 // px from world boundary
@@ -43,8 +46,8 @@ export const HITBOX_RADIUS = 8 // px — fish catch detection
 export const SHARK_OFFSET_MOBILE = 80 // px above touch point
 
 // --- World sizing (× device viewport, fixed at game start) ---
-export const WORLD_WIDTH_MULTIPLIER = 2.5
-export const WORLD_HEIGHT_MULTIPLIER = 2.0
+export const WORLD_WIDTH_MULTIPLIER = 1.6
+export const WORLD_HEIGHT_MULTIPLIER = 1.4
 
 // --- Timing ---
 export const GAME_DURATION = 60 // seconds
