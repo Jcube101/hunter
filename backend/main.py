@@ -15,9 +15,11 @@ import os
 import sqlite3
 from contextlib import asynccontextmanager, contextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
+
+DIFFICULTIES = {"easy", "normal", "hardcore"}
 
 # --- Paths (resolved relative to this file, not the cwd) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -68,17 +70,18 @@ def init_db():
         )
 
 
-def fetch_top(limit=TOP_N):
-    """Return the top scores ordered by score desc, earliest first on a tie."""
+def fetch_top(difficulty, limit=TOP_N):
+    """Top scores for one difficulty, ordered by score desc, earliest first on a tie."""
     with get_connection() as conn:
         rows = conn.execute(
             """
             SELECT id, name, score, theme, difficulty, created_at
             FROM leaderboard
+            WHERE difficulty = ?
             ORDER BY score DESC, created_at ASC
             LIMIT ?
             """,
-            (limit,),
+            (difficulty, limit),
         ).fetchall()
     return [dict(row) for row in rows]
 
@@ -133,9 +136,19 @@ def health():
 
 
 @app.get("/api/leaderboard")
-def get_leaderboard():
-    """Global top 10 scores, highest first. Always an array (possibly empty)."""
-    return fetch_top()
+def get_leaderboard(difficulty: str | None = None):
+    """Top 10 for one difficulty, highest first. Always an array (possibly empty).
+
+    `difficulty` is required (easy|normal|hardcore) — each mode has its own
+    ranked list; cross-difficulty comparison is meaningless. Missing or invalid
+    difficulty -> 400.
+    """
+    if difficulty not in DIFFICULTIES:
+        raise HTTPException(
+            status_code=400,
+            detail="difficulty query param required: easy, normal, or hardcore",
+        )
+    return fetch_top(difficulty)
 
 
 @app.post("/api/leaderboard", status_code=201)

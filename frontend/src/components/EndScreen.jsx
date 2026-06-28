@@ -1,20 +1,22 @@
-// EndScreen.jsx — final score, personal best, and live leaderboard.
+// EndScreen.jsx — final score, personal best, and per-difficulty leaderboards.
 //
-// Owns its own leaderboard data: fetches the global standings on mount, lets a
-// new-PB player submit their score, and shows a full-standings modal overlay.
-// The API is same-origin (/api/leaderboard) — direct in production, via the
-// Vite proxy in dev.
+// There are three independent leaderboards (one per difficulty) — Easy/Normal/
+// Hardcore scores are never compared. The top-5 preview shows the difficulty the
+// player just played; the full overlay has three tabs and defaults to that mode.
+// The API is same-origin (/api/leaderboard?difficulty=…) — direct in production,
+// via the Vite proxy in dev.
 
 import { useCallback, useEffect, useState } from 'react'
 import { theme, ACTIVE_THEME } from '../constants/theme.js'
 
 const MAX_NAME_LENGTH = 20
 const TOP_PREVIEW = 5
+const DIFFICULTY_TABS = ['easy', 'normal', 'hardcore']
 
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : '')
 
-async function getLeaderboard() {
-  const res = await fetch('/api/leaderboard')
+async function getLeaderboard(difficulty) {
+  const res = await fetch(`/api/leaderboard?difficulty=${difficulty}`)
   if (!res.ok) throw new Error(`GET failed (${res.status})`)
   return res.json()
 }
@@ -29,7 +31,8 @@ async function postScore(entry) {
   return res.json()
 }
 
-// Ranked list with shared loading / empty / error states.
+// Ranked list with shared loading / empty / error states. Single-difficulty, so
+// rows show only rank · name · score (the mode is stated by the header/tab).
 function LeaderboardList({ status, entries, limit }) {
   if (status === 'loading') return <p className="text-sm text-slate-400">Loading…</p>
   if (status === 'error') return <p className="text-sm text-rose-400">Couldn&apos;t load scores</p>
@@ -46,9 +49,6 @@ function LeaderboardList({ status, entries, limit }) {
           <span className="flex min-w-0 items-center gap-2">
             <span className="w-5 text-right font-mono text-slate-500">{i + 1}</span>
             <span className="truncate text-slate-100">{e.name}</span>
-            {e.difficulty && (
-              <span className="shrink-0 text-xs text-slate-500">{cap(e.difficulty)}</span>
-            )}
           </span>
           <span className="font-semibold tabular-nums" style={{ color: theme.accent }}>
             {e.score}
@@ -60,26 +60,41 @@ function LeaderboardList({ status, entries, limit }) {
 }
 
 export default function EndScreen({ score, personalBest, isNewPB, difficulty, onPlayAgain }) {
+  // Top-5 preview — always the difficulty just played.
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [entries, setEntries] = useState([])
   const [name, setName] = useState('')
   const [submitState, setSubmitState] = useState('idle') // idle | posting | done | error
   const [showFull, setShowFull] = useState(false)
 
-  const load = useCallback(async () => {
+  // Full overlay — tabbed across all three difficulties; defaults to played mode.
+  const [activeTab, setActiveTab] = useState(difficulty)
+  const [tabEntries, setTabEntries] = useState([])
+  const [tabStatus, setTabStatus] = useState('loading')
+
+  const loadPreview = useCallback(async () => {
     setStatus('loading')
     try {
-      const data = await getLeaderboard()
-      setEntries(data)
+      setEntries(await getLeaderboard(difficulty))
       setStatus('ready')
     } catch {
       setStatus('error')
     }
-  }, [])
+  }, [difficulty])
 
   useEffect(() => {
-    load()
-  }, [load])
+    loadPreview()
+  }, [loadPreview])
+
+  // Fetch the active tab's standings whenever it changes.
+  useEffect(() => {
+    let cancelled = false
+    setTabStatus('loading')
+    getLeaderboard(activeTab)
+      .then((d) => { if (!cancelled) { setTabEntries(d); setTabStatus('ready') } })
+      .catch(() => { if (!cancelled) setTabStatus('error') })
+    return () => { cancelled = true }
+  }, [activeTab])
 
   const handleSubmit = async () => {
     const trimmed = name.trim()
@@ -88,10 +103,18 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
     try {
       await postScore({ name: trimmed, score, theme: ACTIVE_THEME, difficulty })
       setSubmitState('done')
-      load() // refresh so the player sees their entry
+      loadPreview() // refresh so the player sees their entry
+      if (activeTab === difficulty) {
+        getLeaderboard(difficulty).then(setTabEntries).catch(() => {})
+      }
     } catch {
       setSubmitState('error')
     }
+  }
+
+  const openFull = () => {
+    setActiveTab(difficulty) // always default to the mode just played
+    setShowFull(true)
   }
 
   return (
@@ -143,9 +166,11 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
         <p className="text-sm font-semibold text-emerald-400">Added to leaderboard! 🎉</p>
       )}
 
-      {/* Top-5 preview */}
+      {/* Top-5 preview for the difficulty just played */}
       <div className="mt-1 flex flex-col items-center gap-2">
-        <span className="text-xs uppercase tracking-widest text-slate-500">Top scores</span>
+        <span className="text-xs uppercase tracking-widest text-slate-500">
+          Top scores — {cap(difficulty)} mode
+        </span>
         <LeaderboardList status={status} entries={entries} limit={TOP_PREVIEW} />
       </div>
 
@@ -158,17 +183,14 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
           Play Again
         </button>
         <button
-          onClick={() => {
-            setShowFull(true)
-            load() // refresh on open
-          }}
+          onClick={openFull}
           className="rounded-xl border border-slate-600 px-8 py-2 text-sm font-semibold text-slate-200 transition active:scale-95"
         >
           Full Leaderboard
         </button>
       </div>
 
-      {/* Full standings modal */}
+      {/* Full standings modal — three difficulty tabs */}
       {showFull && (
         <div
           className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm"
@@ -179,7 +201,23 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-2xl font-bold text-slate-100">Leaderboard</h3>
-            <LeaderboardList status={status} entries={entries} limit={10} />
+            <div className="flex items-center gap-2">
+              {DIFFICULTY_TABS.map((tab) => {
+                const active = activeTab === tab
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    aria-pressed={active}
+                    className="rounded-lg px-4 py-1.5 text-sm font-semibold transition active:scale-95"
+                    style={active ? { color: theme.accent } : { color: '#64748b' }}
+                  >
+                    {cap(tab)}
+                  </button>
+                )
+              })}
+            </div>
+            <LeaderboardList status={tabStatus} entries={tabEntries} limit={10} />
             <button
               onClick={() => setShowFull(false)}
               className="mt-1 rounded-lg border border-slate-600 px-6 py-2 text-sm font-semibold text-slate-200 transition active:scale-95"
