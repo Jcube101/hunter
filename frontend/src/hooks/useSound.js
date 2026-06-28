@@ -1,105 +1,90 @@
-// useSound.js — Tone.js audio. This is the ONLY file that imports Tone.
+// useSound.js — HTML5 Audio playback from real mp3 files (no Tone.js).
 //
-// Three generated sounds: a light, airy ambient shimmer (while playing, audible
-// on phone speakers, non-haunting), a short catch chomp, and a distinct
-// descending game-over tone. A mute toggle (persisted in localStorage) gates
-// everything at the destination.
+// Four assets in public/audio/: a looping underwater ambient, a bubble-pop catch
+// sound, a game-over tone, and a congrats sting for a new personal best. A mute
+// toggle (persisted in localStorage) gates everything.
 //
-// The AudioContext must be unlocked inside a user gesture — playAmbient() is
-// first called from the Play tap (see App.startGame), which satisfies that.
+// Browser autoplay policy: the ambient must first .play() inside a user gesture
+// (the Play tap → App.startGame → playAmbient), which unlocks audio for the page.
 
-import { useCallback, useRef, useState } from 'react'
-import * as Tone from 'tone'
+import { useRef, useState, useEffect, useCallback } from 'react'
 
 const MUTE_KEY = 'hunter_mute'
-const AMBIENT_LEVEL = 0.1 // linear gain ≈ -20 dB — light, present, not intrusive
-const AMBIENT_FREQ = 700 // Hz — airy mid-high "shimmer" (phone-audible, non-haunting)
+
+const AMBIENT_VOLUME = 0.3
+const CATCH_VOLUME = 0.5
+const END_VOLUME = 0.7
+const CONGRATS_VOLUME = 0.7
 
 export function useSound() {
+  const ambientRef = useRef(null)
+  // muted is React state (so the start-screen icon re-renders) mirrored into a
+  // ref (so the rAF-triggered SFX callbacks read it without re-subscribing).
   const [muted, setMuted] = useState(() => localStorage.getItem(MUTE_KEY) === 'true')
   const mutedRef = useRef(muted)
   mutedRef.current = muted
 
-  const nodesRef = useRef(null)
-
-  // Lazily build the audio graph and unlock the context (user-gesture safe).
-  const ensureInit = useCallback(async () => {
-    if (nodesRef.current) return
-    await Tone.start()
-
-    // Ambient: a light, airy "shimmer". A steady ~700Hz triangle with a slow,
-    // shallow amplitude breathe — NO fast tremolo (the old tremolo'd burble
-    // sounded haunting). Gentle and atmospheric, suggests water without being
-    // eerie, and carries on small phone speakers. Routed through an on/off gain.
-    //   osc -> breathe (LFO multiplier 0.7..1.0) -> ambientVol (0..AMBIENT_LEVEL)
-    const ambientVol = new Tone.Gain(0).toDestination()
-    const ambientBreathe = new Tone.Gain(1).connect(ambientVol)
-    const ambientOsc = new Tone.Oscillator(AMBIENT_FREQ, 'triangle').connect(ambientBreathe)
-    ambientOsc.start()
-    const ambientLfo = new Tone.LFO({ frequency: 0.25, min: 0.7, max: 1.0 }).start()
-    ambientLfo.connect(ambientBreathe.gain)
-
-    // Catch: short percussive chomp.
-    const catchSynth = new Tone.MembraneSynth({
-      pitchDecay: 0.008,
-      octaves: 2,
-      envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.02 },
-      volume: -9,
-    }).toDestination()
-
-    // Game over: descending tone, clearly distinct from the catch.
-    const endSynth = new Tone.Synth({
-      oscillator: { type: 'triangle' },
-      envelope: { attack: 0.01, decay: 0.4, sustain: 0, release: 0.1 },
-      volume: -10,
-    }).toDestination()
-
-    nodesRef.current = { ambientVol, catchSynth, endSynth }
-    Tone.getDestination().mute = mutedRef.current
-
-    // Dev-only probe for Playwright (stripped from production builds).
-    if (import.meta.env.DEV) {
-      window.__hunterAudio = {
-        state: () => Tone.getContext().state,
-        muted: () => Tone.getDestination().mute,
-        ambientGain: () => ambientVol.gain.value,
-        // No LFO drives the oscillator frequency now, so this reads correctly.
-        ambientFreq: () => ambientOsc.frequency.value,
-      }
+  // Preload the looping ambient once.
+  useEffect(() => {
+    const a = new Audio('/audio/Ambient_Loop.mp3')
+    a.loop = true
+    a.volume = AMBIENT_VOLUME
+    ambientRef.current = a
+    return () => {
+      a.pause()
     }
   }, [])
 
-  const playAmbient = useCallback(async () => {
-    await ensureInit()
-    nodesRef.current.ambientVol.gain.rampTo(AMBIENT_LEVEL, 0.5)
-  }, [ensureInit])
+  const playAmbient = useCallback(() => {
+    if (mutedRef.current || !ambientRef.current) return
+    ambientRef.current.currentTime = 0
+    ambientRef.current.play().catch(() => {})
+  }, [])
 
   const stopAmbient = useCallback(() => {
-    if (nodesRef.current) nodesRef.current.ambientVol.gain.rampTo(0, 0.3)
+    const a = ambientRef.current
+    if (!a) return
+    a.pause()
+    a.currentTime = 0
   }, [])
 
-  const playCatch = useCallback(() => {
-    if (nodesRef.current) nodesRef.current.catchSynth.triggerAttackRelease('C2', 0.1)
+  // Fire-and-forget one-shot: a fresh Audio element so overlapping catches don't
+  // cut each other off.
+  const playOneShot = useCallback((src, volume) => {
+    if (mutedRef.current) return
+    const audio = new Audio(src)
+    audio.volume = volume
+    audio.play().catch(() => {})
   }, [])
 
-  const playEnd = useCallback(() => {
-    if (!nodesRef.current) return
-    const synth = nodesRef.current.endSynth
-    const now = Tone.now()
-    synth.triggerAttack('A4', now)
-    synth.frequency.rampTo('A3', 0.4, now)
-    synth.triggerRelease(now + 0.45)
-  }, [])
+  const playCatch = useCallback(() => playOneShot('/audio/Bubble_Pop.mp3', CATCH_VOLUME), [playOneShot])
+  const playEnd = useCallback(() => playOneShot('/audio/Game_Over.mp3', END_VOLUME), [playOneShot])
+  const playCongrats = useCallback(
+    () => playOneShot('/audio/Congrats.mp3', CONGRATS_VOLUME),
+    [playOneShot],
+  )
 
   const toggleMute = useCallback(() => {
     setMuted((prev) => {
       const next = !prev
+      mutedRef.current = next
       localStorage.setItem(MUTE_KEY, String(next))
-      // getDestination() is safe before the context starts.
-      Tone.getDestination().mute = next
+      if (next && ambientRef.current) ambientRef.current.pause()
       return next
     })
   }, [])
 
-  return { playAmbient, stopAmbient, playCatch, playEnd, muted, toggleMute }
+  const isMuted = useCallback(() => mutedRef.current, [])
+
+  // Dev-only probe for Playwright (stripped from production builds).
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      window.__hunterAudio = {
+        muted: () => mutedRef.current,
+        ambientPaused: () => (ambientRef.current ? ambientRef.current.paused : true),
+      }
+    }
+  }, [])
+
+  return { playAmbient, stopAmbient, playCatch, playEnd, playCongrats, muted, toggleMute, isMuted }
 }

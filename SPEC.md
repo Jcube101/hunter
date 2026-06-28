@@ -15,7 +15,7 @@
 | Styling | Tailwind CSS 4 | UI screens only — canvas styled directly |
 | Backend | FastAPI (Python 3.11) | Standard Pi stack, serves both API and static frontend |
 | Database | SQLite 3 | Single-table leaderboard, no concurrent writes, no migration complexity |
-| Audio | Tone.js | Generated sounds, no audio file hosting needed |
+| Audio | HTML5 Audio (mp3) | Real recorded sounds in public/audio/ — ambient loop + SFX |
 | Server | systemd service `hunter` | Type=simple, auto-restart, same pattern as all Pi services |
 | Tunnel | Cloudflare Tunnel `pi-home` | hunter.job-joseph.com → localhost:8013 |
 
@@ -37,7 +37,7 @@ hunter/                              ← repo root
                 useGameLoop.js       ← requestAnimationFrame loop
                 useBoids.js          ← simulation state + update logic
                 useInput.js          ← mouse (desktop) + virtual joystick (mobile). Joystick: fixed bottom-left, touch controls direction + speed via displacement. Mouse: direct world coordinate tracking, unchanged from previous sessions.
-                useSound.js          ← Tone.js audio — ambient drone, catch sfx, timer-end, mute toggle
+                useSound.js          ← HTML5 Audio — ambient loop, catch/end/congrats sfx, mute toggle
                 useFullscreen.js     ← Fullscreen API + orientation lock
             constants/
                 boids.js             ← ALL tuning parameters (see GDD.md)

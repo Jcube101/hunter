@@ -106,7 +106,7 @@ export default function App() {
   }, [])
   const { enter, exit } = useFullscreen(handleFullscreenExit)
 
-  // Sound (Tone.js). Kept in a ref so the rAF loop can trigger SFX without
+  // Sound (HTML5 Audio). Kept in a ref so the rAF loop can trigger SFX without
   // re-subscribing; the lifecycle handlers use it too.
   const sound = useSound()
   const soundRef = useRef(sound)
@@ -314,12 +314,14 @@ export default function App() {
     stop()
     exit()
     soundRef.current.stopAmbient()
-    soundRef.current.playEnd()
     const stored = parseInt(localStorage.getItem(PB_KEY) ?? '-1', 10)
     const prevPB = Number.isNaN(stored) ? -1 : stored
     const score = scoreRef.current
     const isNewPB = score > prevPB
     if (isNewPB) localStorage.setItem(PB_KEY, String(score))
+    // Game-over tone always; on a new PB, follow it with a congrats sting.
+    soundRef.current.playEnd()
+    if (isNewPB) setTimeout(() => soundRef.current.playCongrats(), 800)
     setEndData({ score, personalBest: isNewPB ? score : prevPB, isNewPB })
     setGameState('end')
   }

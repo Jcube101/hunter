@@ -187,4 +187,4 @@ This keeps GDD.md accurate as the canonical reference.
 - Don't put game logic inside React components
 - Don't call setState inside the rAF loop
 - Don't add dependencies without a clear reason
-  (current frontend deps: React, Vite, Tailwind, Tone.js — that's it)
+  (current frontend deps: React, Vite, Tailwind — that's it; audio is plain HTML5 Audio)
