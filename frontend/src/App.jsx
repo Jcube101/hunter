@@ -391,8 +391,15 @@ export default function App() {
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      {/* Always-mounted game canvas, behind the UI overlays. */}
-      <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
+      {/* Always-mounted game canvas (keeps its 2D context + listeners across
+          screens), but hidden whenever we're not actively playing/paused so the
+          frozen game never shows behind the start/end/tutorial overlays. The
+          body's navy (#0a1628) backs those screens. */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 block h-full w-full"
+        style={{ visibility: isGameView ? 'visible' : 'hidden' }}
+      />
 
       {isGameView && <Minimap ref={minimapRef} width={minimapSize.width} height={minimapSize.height} />}
       {screen === 'playing' && (

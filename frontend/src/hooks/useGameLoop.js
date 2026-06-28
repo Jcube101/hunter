@@ -30,6 +30,10 @@ export function useGameLoop(update, draw) {
     const dt = Math.min(elapsedMs / (1000 / 60), 3)
     const dtSeconds = elapsedMs / 1000
     updateRef.current(dt, dtSeconds)
+    // update() may end the game (calls stop() → runningRef=false). Bail before
+    // drawing or re-scheduling so no rAF callback survives game end — the canvas
+    // is then frozen on its last frame (and hidden by the end screen).
+    if (!runningRef.current) return
     drawRef.current()
     rafRef.current = requestAnimationFrame(loop)
   }, [])
