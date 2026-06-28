@@ -357,7 +357,6 @@ export default function App() {
           personalBest={endData.personalBest}
           isNewPB={endData.isNewPB}
           onPlayAgain={startGame}
-          // onSubmitScore / onShowLeaderboard wired in Session 3
         />
       )}
     </div>
