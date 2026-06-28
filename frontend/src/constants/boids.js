@@ -61,8 +61,11 @@ export const HITBOX_RADIUS = 12 // px — fish catch detection
 //     Direction + speed both come from stick displacement. ---
 export const SHARK_OFFSET_MOBILE = 80 // px above touch point (legacy; pre-joystick)
 export const JOYSTICK_RADIUS = 60 // px — max knob displacement from base center (= full speed)
-export const JOYSTICK_BASE_X = JOYSTICK_RADIUS + 20 // px from left edge to base center
-export const JOYSTICK_BASE_Y = JOYSTICK_RADIUS + 20 // px from bottom edge to base center
+export const JOYSTICK_MARGIN = 40 // px — gap from left/bottom edge to the base ring (was 20)
+// Base center offset from the left edge / bottom edge. Renderer and useInput
+// both derive the center from these, so they can never drift apart.
+export const JOYSTICK_BASE_X = JOYSTICK_MARGIN + JOYSTICK_RADIUS // px from left edge to center
+export const JOYSTICK_BASE_Y = JOYSTICK_MARGIN + JOYSTICK_RADIUS // px from bottom edge to center
 export const JOYSTICK_ACTIVATE_RADIUS = 80 // px — touch within this of base center grabs the stick
 export const JOYSTICK_KNOB_RADIUS = 20 // px — drawn knob radius
 

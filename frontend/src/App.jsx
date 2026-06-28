@@ -47,6 +47,7 @@ import {
 
 const PB_KEY = 'hunter_pb'
 const DIFFICULTY_KEY = 'hunter_difficulty'
+const TUTORIAL_KEY = 'hunter_tutorial_seen'
 
 export default function App() {
   const [screen, setScreen] = useState('start') // start | playing | paused | end
@@ -91,6 +92,9 @@ export default function App() {
   // Catches are disabled during a brief grace period at game start (Fix 3).
   const graceRef = useRef(true)
   const graceTimerRef = useRef(null)
+  // First-play joystick hint: shown until the tutorial has been seen. Snapshotted
+  // at game start so the draw loop doesn't hit localStorage every frame.
+  const joystickHintRef = useRef(false)
 
   // HUD display state (synced only on events)
   const [displayScore, setDisplayScore] = useState(0)
@@ -247,7 +251,7 @@ export default function App() {
     // Virtual joystick overlay — mobile only, screen-space (after shake restore
     // so it never jitters). Base transform still carries the HiDPI scale.
     if (vp.width < MOBILE_BREAKPOINT) {
-      drawJoystick(ctx, joystickRef.current, vp)
+      drawJoystick(ctx, joystickRef.current, vp, joystickHintRef.current)
     }
 
     // Minimap on its own canvas (no shake).
@@ -266,6 +270,9 @@ export default function App() {
     // Lock the difficulty's fish-flee settings for this game (selector is
     // start-screen only). Shark speed is constant (SHARK_SPEED) in all modes.
     fleeSettingsRef.current = DIFFICULTY_SETTINGS[difficulty]
+
+    // Show the joystick hint only until the tutorial has been seen.
+    joystickHintRef.current = localStorage.getItem(TUTORIAL_KEY) !== 'true'
 
     await enter() // fullscreen + landscape lock (best effort)
 
