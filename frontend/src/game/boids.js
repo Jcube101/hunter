@@ -142,8 +142,10 @@ function maxSpeedFor(fish, predator) {
 // --- Main per-fish update ---------------------------------------------------
 
 // Applies all five forces, clamps to the proximity-scaled max speed, and
-// returns a NEW fish object. Does not mutate `fish`.
-export function updateFish(fish, allFish, predator, world) {
+// returns a NEW fish object. Does not mutate `fish`. `dt` is the frame-
+// normalized delta (~1.0 at 60Hz) so the position advance is refresh-rate
+// independent; the velocity/force constants themselves are never scaled.
+export function updateFish(fish, allFish, predator, world, dt = 1) {
   const sep = separation(fish, allFish, SEPARATION_RADIUS, SEPARATION_WEIGHT)
   const ali = alignment(fish, allFish, ALIGNMENT_RADIUS, ALIGNMENT_WEIGHT)
   const coh = cohesion(fish, allFish, COHESION_RADIUS, COHESION_WEIGHT)
@@ -158,13 +160,14 @@ export function updateFish(fish, allFish, predator, world) {
   vx = clamped.x
   vy = clamped.y
 
-  return { x: fish.x + vx, y: fish.y + vy, vx, vy }
+  return { x: fish.x + vx * dt, y: fish.y + vy * dt, vx, vy }
 }
 
 // Advance the whole school one tick. Returns a NEW array (no mutation), so the
-// per-fish forces all read the same pre-tick snapshot.
-export function updateSchool(fish, predator, world) {
-  return fish.map((f) => updateFish(f, fish, predator, world))
+// per-fish forces all read the same pre-tick snapshot. `dt` is forwarded to
+// each fish for frame-rate-independent motion.
+export function updateSchool(fish, predator, world, dt = 1) {
+  return fish.map((f) => updateFish(f, fish, predator, world, dt))
 }
 
 // --- Spawning ---------------------------------------------------------------

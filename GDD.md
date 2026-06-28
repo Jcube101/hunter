@@ -305,7 +305,7 @@ together after playtesting.
 | `FISH_COUNT_DESKTOP` | 50 | |
 | `FISH_BASE_SPEED` | 2.5 | px/frame |
 | `FISH_FLEE_SPEED` | 4.0 | px/frame — at predator contact |
-| `SHARK_SPEED` | 3.8 | px/frame |
+| `SHARK_SPEED` | 3.8 | Lowered from 4.5 → 3.8 so fleeing fish outrun a direct chase. Design intent: intercept, don't chase. |
 | `FLEE_RADIUS` | 120 | px — fish notice predator within this |
 | `FLEE_WEIGHT` | 3.0 | Dominates all other forces |
 | `SEPARATION_RADIUS` | 25 | px |
@@ -322,6 +322,7 @@ together after playtesting.
 | `WORLD_HEIGHT_MULTIPLIER` | 2.0 | × viewport height |
 | `GAME_DURATION` | 60 | seconds |
 | `LOW_TIME_THRESHOLD` | 10 | seconds — timer turns red |
+| `GRACE_PERIOD` | 2000 | ms — catch disabled at game start to prevent spawn kills |
 
 ---
 

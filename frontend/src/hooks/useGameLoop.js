@@ -1,9 +1,12 @@
 // useGameLoop.js — requestAnimationFrame loop driver.
 //
-// Calls update(deltaSeconds) then draw() each frame. update/draw are kept in
-// refs so the loop always invokes the latest closures without re-subscribing.
-// Starts/stops cleanly and cancels any pending frame on unmount — no lingering
-// loops. Per CONTRIBUTING.md, the loop never triggers React re-renders itself.
+// Calls update(dt, dtSeconds) then draw() each frame, where:
+//   - dt        = frame-normalized delta (~1.0 at 60Hz, ~0.5 at 120Hz) used to
+//                 keep motion identical across refresh rates; capped at 3.
+//   - dtSeconds = wall-clock seconds, used by the timer.
+// update/draw are kept in refs so the loop always invokes the latest closures
+// without re-subscribing. Starts/stops cleanly and cancels any pending frame on
+// unmount. Per CONTRIBUTING.md, the loop never triggers React re-renders itself.
 
 import { useRef, useCallback, useEffect } from 'react'
 
@@ -20,9 +23,13 @@ export function useGameLoop(update, draw) {
   const loop = useCallback((now) => {
     if (!runningRef.current) return
     // First frame has no prior timestamp; assume one 60fps step.
-    const dt = lastRef.current ? (now - lastRef.current) / 1000 : 1 / 60
+    const elapsedMs = lastRef.current ? now - lastRef.current : 1000 / 60
     lastRef.current = now
-    updateRef.current(dt)
+    // Frame-normalized delta: ~1.0 at 60Hz. Capped at 3 to prevent a
+    // spiral-of-death after the tab is backgrounded.
+    const dt = Math.min(elapsedMs / (1000 / 60), 3)
+    const dtSeconds = elapsedMs / 1000
+    updateRef.current(dt, dtSeconds)
     drawRef.current()
     rafRef.current = requestAnimationFrame(loop)
   }, [])

@@ -66,3 +66,6 @@ export const SHAKE_OFFSET = 4 // px
 export const ROTATION_VELOCITY_THRESHOLD = 0.1 // px/frame
 // Minimap width as a fraction of viewport width (GDD.md: ~15%).
 export const MINIMAP_VIEWPORT_FRACTION = 0.15
+// Catch detection is disabled for this long at game start so the school can
+// scatter from the shared center spawn before the player can score (GDD.md).
+export const GRACE_PERIOD = 2000 // ms

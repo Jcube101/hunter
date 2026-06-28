@@ -36,15 +36,17 @@ export function spawnParticles(x, y) {
 
 // Advance every particle one frame and drop the dead ones. Returns a NEW array.
 // Bubbles drift slightly upward (negative y) and decelerate as they rise.
-export function updateParticles(particles) {
+// `dt` is the frame-normalized delta (~1.0 at 60Hz) applied to the position
+// advance so bubbles travel at the same speed regardless of refresh rate.
+export function updateParticles(particles, dt = 1) {
   const next = []
   for (const p of particles) {
     const life = p.life - 1
     if (life <= 0) continue
     next.push({
       ...p,
-      x: p.x + p.vx,
-      y: p.y + p.vy - 0.3, // gentle buoyancy
+      x: p.x + p.vx * dt,
+      y: p.y + (p.vy - 0.3) * dt, // gentle buoyancy
       vx: p.vx * 0.92,
       vy: p.vy * 0.92,
       life,

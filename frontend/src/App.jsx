@@ -39,6 +39,7 @@ import {
   SHAKE_OFFSET,
   ROTATION_VELOCITY_THRESHOLD,
   MINIMAP_VIEWPORT_FRACTION,
+  GRACE_PERIOD,
 } from './constants/boids.js'
 
 const PB_KEY = 'hunter_pb'
@@ -56,6 +57,8 @@ export default function App() {
   const minimapRef = useRef(null)
   const cameraRef = useRef(null)
   const [minimapSize, setMinimapSize] = useState({ width: 0, height: 0 })
+  const dprRef = useRef(1) // devicePixelRatio — HiDPI backing-store scale
+  const viewportRef = useRef({ width: 0, height: 0 }) // viewport in CSS pixels
 
   // Simulation state (refs). `tickBoids` advances the school one frame using
   // the current predator (already updated by movePredator each frame).
@@ -67,6 +70,9 @@ export default function App() {
   const lastSecondRef = useRef(GAME_DURATION)
   const particlesRef = useRef([])
   const shakeRef = useRef(0)
+  // Catches are disabled during a brief grace period at game start (Fix 3).
+  const graceRef = useRef(true)
+  const graceTimerRef = useRef(null)
 
   // HUD display state (synced only on events)
   const [displayScore, setDisplayScore] = useState(0)
@@ -84,8 +90,23 @@ export default function App() {
   }, [])
   const { enter, exit } = useFullscreen(handleFullscreenExit)
 
+  // Size the main canvas backing store for HiDPI: CSS pixels * devicePixelRatio.
+  // The 2D context is scaled (in onFrameDraw) so all drawing + game coordinates
+  // stay in CSS pixels. Re-run on init and on any resize / fullscreen change.
+  const sizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const cssW = canvas.offsetWidth || window.innerWidth
+    const cssH = canvas.offsetHeight || window.innerHeight
+    canvas.width = Math.round(cssW * dpr)
+    canvas.height = Math.round(cssH * dpr)
+    dprRef.current = dpr
+    viewportRef.current = { width: cssW, height: cssH }
+  }, [])
+
   // --- Predator movement -----------------------------------------------------
-  const movePredator = useCallback(() => {
+  const movePredator = useCallback((dt) => {
     const p = predatorRef.current
     const world = worldRef.current
     const target = inputPosRef.current || { x: p.x, y: p.y }
@@ -97,7 +118,9 @@ export default function App() {
     let vx = 0
     let vy = 0
     if (dist > 0) {
-      const step = Math.min(SHARK_SPEED, dist)
+      // Frame-normalized step so the shark covers SHARK_SPEED px per 60Hz frame
+      // regardless of refresh rate; never overshoot the target.
+      const step = Math.min(SHARK_SPEED * dt, dist)
       vx = (dx / dist) * step
       vy = (dy / dist) * step
     }
@@ -115,41 +138,40 @@ export default function App() {
   }, [predatorRef, worldRef, inputPosRef])
 
   // --- Per-frame update ------------------------------------------------------
-  const onFrameUpdate = useCallback((dt) => {
-    movePredator()
-    tickBoids()
+  // dt = frame-normalized delta (motion), dtSeconds = wall-clock (timer).
+  const onFrameUpdate = useCallback((dt, dtSeconds) => {
+    movePredator(dt)
+    tickBoids(dt)
 
-    const canvas = canvasRef.current
-    cameraRef.current = updateCamera(predatorRef.current, worldRef.current, {
-      width: canvas.width,
-      height: canvas.height,
-    })
+    cameraRef.current = updateCamera(predatorRef.current, worldRef.current, viewportRef.current)
 
-    // Catch detection: mouth point vs each fish center.
-    const p = predatorRef.current
-    const mouthX = p.x + Math.cos(p.angle) * SHARK_MOUTH_OFFSET
-    const mouthY = p.y + Math.sin(p.angle) * SHARK_MOUTH_OFFSET
-    const survivors = []
-    let caughtAny = false
-    for (const f of fishRef.current) {
-      if (Math.hypot(mouthX - f.x, mouthY - f.y) < HITBOX_RADIUS) {
-        particlesRef.current = particlesRef.current.concat(spawnParticles(f.x, f.y))
-        scoreRef.current += 1
-        caughtAny = true
-      } else {
-        survivors.push(f)
+    // Catch detection (disabled during the spawn grace period — Fix 3).
+    if (!graceRef.current) {
+      const p = predatorRef.current
+      const mouthX = p.x + Math.cos(p.angle) * SHARK_MOUTH_OFFSET
+      const mouthY = p.y + Math.sin(p.angle) * SHARK_MOUTH_OFFSET
+      const survivors = []
+      let caughtAny = false
+      for (const f of fishRef.current) {
+        if (Math.hypot(mouthX - f.x, mouthY - f.y) < HITBOX_RADIUS) {
+          particlesRef.current = particlesRef.current.concat(spawnParticles(f.x, f.y))
+          scoreRef.current += 1
+          caughtAny = true
+        } else {
+          survivors.push(f)
+        }
+      }
+      if (caughtAny) {
+        fishRef.current = survivors
+        shakeRef.current = SHAKE_FRAMES
+        setDisplayScore(scoreRef.current) // event-driven state sync
       }
     }
-    if (caughtAny) {
-      fishRef.current = survivors
-      shakeRef.current = SHAKE_FRAMES
-      setDisplayScore(scoreRef.current) // event-driven state sync
-    }
 
-    particlesRef.current = updateParticles(particlesRef.current)
+    particlesRef.current = updateParticles(particlesRef.current, dt)
 
-    // Timer (real wall-clock seconds). Sync display only on second boundaries.
-    timeLeftRef.current -= dt
+    // Timer uses wall-clock seconds (unchanged). Sync display on second boundaries.
+    timeLeftRef.current -= dtSeconds
     const whole = Math.max(0, Math.ceil(timeLeftRef.current))
     if (whole !== lastSecondRef.current) {
       lastSecondRef.current = whole
@@ -168,12 +190,15 @@ export default function App() {
     const cam = cameraRef.current
     if (!canvas || !cam) return
     const ctx = canvas.getContext('2d')
+    const dpr = dprRef.current
+    const vp = viewportRef.current
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    // Base transform carries the HiDPI scale; all drawing below is in CSS pixels.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, vp.width, vp.height)
 
-    // Background fills the whole canvas first so screen shake never exposes a gap.
-    drawBackground(ctx, { width: canvas.width, height: canvas.height }, theme)
+    // Background fills the whole viewport first so screen shake never exposes a gap.
+    drawBackground(ctx, vp, theme)
 
     ctx.save()
     if (shakeRef.current > 0) {
@@ -201,19 +226,18 @@ export default function App() {
   const startGame = useCallback(async () => {
     await enter() // fullscreen + landscape lock (best effort)
 
-    const canvas = canvasRef.current
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
+    sizeCanvas() // HiDPI backing store + viewportRef (CSS pixels)
+    const vp = viewportRef.current
 
     const world = {
-      width: canvas.width * WORLD_WIDTH_MULTIPLIER,
-      height: canvas.height * WORLD_HEIGHT_MULTIPLIER,
+      width: vp.width * WORLD_WIDTH_MULTIPLIER,
+      height: vp.height * WORLD_HEIGHT_MULTIPLIER,
     }
-    const count = window.innerWidth < MOBILE_BREAKPOINT ? FISH_COUNT_MOBILE : FISH_COUNT_DESKTOP
+    const count = vp.width < MOBILE_BREAKPOINT ? FISH_COUNT_MOBILE : FISH_COUNT_DESKTOP
     init(count, world)
 
     // Minimap sized to ~15% viewport width, proportional to world aspect.
-    const mmW = Math.round(canvas.width * MINIMAP_VIEWPORT_FRACTION)
+    const mmW = Math.round(vp.width * MINIMAP_VIEWPORT_FRACTION)
     const mmH = Math.round(mmW * (world.height / world.width))
     setMinimapSize({ width: mmW, height: mmH })
 
@@ -224,17 +248,19 @@ export default function App() {
     particlesRef.current = []
     shakeRef.current = 0
     inputPosRef.current = { x: world.width / 2, y: world.height / 2 }
-    cameraRef.current = updateCamera(predatorRef.current, world, {
-      width: canvas.width,
-      height: canvas.height,
-    })
+    cameraRef.current = updateCamera(predatorRef.current, world, vp)
+
+    // Spawn grace period: disable catches so the school scatters first (Fix 3).
+    graceRef.current = true
+    clearTimeout(graceTimerRef.current)
+    graceTimerRef.current = setTimeout(() => { graceRef.current = false }, GRACE_PERIOD)
 
     setDisplayScore(0)
     setDisplayTime(GAME_DURATION)
     setGameState('playing')
     start()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enter, init, start, setGameState])
+  }, [enter, init, start, setGameState, sizeCanvas])
 
   function pauseGame() {
     stop()
@@ -274,6 +300,21 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Re-apply HiDPI sizing when the viewport changes (incl. entering/exiting
+  // fullscreen). World dimensions stay fixed (GDD.md) — only the backing store
+  // and the CSS-pixel viewport used by the camera are refreshed (Fix 2).
+  useEffect(() => {
+    const onResize = () => {
+      if (stateRef.current === 'playing' || stateRef.current === 'paused') sizeCanvas()
+    }
+    window.addEventListener('resize', onResize)
+    document.addEventListener('fullscreenchange', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      document.removeEventListener('fullscreenchange', onResize)
+    }
+  }, [sizeCanvas])
 
   // Dev-only test hook: expose live game refs for browser verification.
   // Vite replaces import.meta.env.DEV with false in production and strips this.

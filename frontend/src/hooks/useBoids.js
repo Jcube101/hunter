@@ -25,11 +25,10 @@ export function useBoids() {
     }
   }, [])
 
-  // Run one simulation tick. Accepts the current predator (optional) and
-  // returns the updated fish array.
-  const update = useCallback((predatorPos) => {
-    if (predatorPos) predatorRef.current = predatorPos
-    fishRef.current = updateSchool(fishRef.current, predatorRef.current, worldRef.current)
+  // Run one simulation tick using the current predator (set by App each frame).
+  // `dt` is the frame-normalized delta; returns the updated fish array.
+  const update = useCallback((dt = 1) => {
+    fishRef.current = updateSchool(fishRef.current, predatorRef.current, worldRef.current, dt)
     return fishRef.current
   }, [])
 
