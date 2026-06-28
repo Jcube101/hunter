@@ -83,9 +83,11 @@ export const INITIAL_VELOCITY_RANGE = 1.5 // ±px/frame randomised spawn velocit
 
 // --- Geometry / feel constants (not in the GDD tuning table, but kept here so
 //     nothing is hardcoded inline; see CONTRIBUTING.md). ---
-// Distance from shark center to its mouth/front tip. Shared by the renderer
-// (sprite tip) and the catch check so the visual and hitbox stay in sync.
-export const SHARK_MOUTH_OFFSET = 16 // px
+// Distance from shark center to its mouth/front tip (= half the body length).
+// Drives both the catch point and the sprite scale in renderer.drawShark, so the
+// visual front tip always sits exactly on the catch point. Raised 16 -> 28: the
+// sprite scales 28/16 = 1.75x, giving a ~56px-long body (was ~32px).
+export const SHARK_MOUTH_OFFSET = 28 // px
 // Screen shake on catch (GDD.md "On Catch": 3 frames, 4px offset).
 export const SHAKE_FRAMES = 3
 export const SHAKE_OFFSET = 4 // px

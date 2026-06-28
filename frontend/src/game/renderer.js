@@ -53,14 +53,23 @@ export function drawFish(ctx, fishList, camera, theme) {
 // Canvas-drawn shark, facing +X in local space (the rotate transform handles
 // heading). All shapes are positioned so the snout/front tip sits at
 // SHARK_MOUTH_OFFSET — the same point the catch check uses.
+// The silhouette below was authored with its front tip at local x = AUTHORED_NOSE.
+// We scale the whole sprite uniformly so that tip lands exactly on the real catch
+// point (SHARK_MOUTH_OFFSET world px). Bumping SHARK_MOUTH_OFFSET enlarges the
+// shark while keeping every proportion and the tip↔catch-point alignment.
+const AUTHORED_NOSE = 16 // px — front tip in the silhouette's authored units
+
 export function drawShark(ctx, predator, camera, theme) {
   const s = worldToScreen(predator.x, predator.y, camera)
   const sk = theme.shark
-  const nose = SHARK_MOUTH_OFFSET // front tip x — aligns visual with catch point
+  const nose = AUTHORED_NOSE // front tip x in authored units (scaled to the catch point below)
 
   ctx.save()
   ctx.translate(s.x, s.y)
   ctx.rotate(headingOf(predator))
+  // Uniform scale: authored tip (AUTHORED_NOSE) -> SHARK_MOUTH_OFFSET world px.
+  const scale = SHARK_MOUTH_OFFSET / AUTHORED_NOSE
+  ctx.scale(scale, scale)
 
   // --- Tail fin: two angled triangles forming a crescent (drawn first) ---
   ctx.fillStyle = sk.fin
