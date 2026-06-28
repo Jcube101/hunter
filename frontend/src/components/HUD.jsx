@@ -11,17 +11,22 @@ function formatTime(seconds) {
   return `${mm}:${ss}`
 }
 
-export default function HUD({ score, timeLeft }) {
+export default function HUD({ score, timeLeft, difficulty }) {
   const low = timeLeft <= LOW_TIME_THRESHOLD
+  const modeLabel = difficulty ? difficulty[0].toUpperCase() + difficulty.slice(1) : ''
 
   return (
     // pointer-events-none so the HUD never intercepts canvas input
     <div className="pointer-events-none absolute inset-0 select-none">
-      <div
-        className="absolute left-5 top-4 text-3xl font-bold tabular-nums"
-        style={{ color: theme.hud.text }}
-      >
-        {score}
+      <div className="absolute left-5 top-4">
+        <div className="text-3xl font-bold tabular-nums" style={{ color: theme.hud.text }}>
+          {score}
+        </div>
+        {modeLabel && (
+          <div className="text-xs font-medium uppercase tracking-wider text-slate-400">
+            {modeLabel}
+          </div>
+        )}
       </div>
       <div
         className={`absolute right-5 top-4 text-3xl font-bold tabular-nums ${low ? 'animate-pulse' : ''}`}

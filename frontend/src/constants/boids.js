@@ -14,7 +14,16 @@ export const FISH_COUNT_DESKTOP = 50
 // --- Speeds (px/frame) ---
 export const FISH_BASE_SPEED = 2.5
 export const FISH_FLEE_SPEED = 4.0 // at predator contact
-export const SHARK_SPEED = 3.8 // faster than base, slower than flee speed
+export const SHARK_SPEED = 3.8 // Normal baseline; difficulty overrides at game start
+
+// Difficulty modes affect shark speed ONLY (see GDD.md "Difficulty Modes").
+// The game reads the selected speed from here; it never mutates SHARK_SPEED.
+export const DIFFICULTY_SPEEDS = {
+  easy: 4.0, // matches flee speed — forgiving
+  normal: 3.8, // default — requires interception
+  hardcore: 3.6, // noticeably slower — patience + positioning
+}
+export const DEFAULT_DIFFICULTY = 'normal'
 
 // --- Flee (predator avoidance) ---
 export const FLEE_RADIUS = 100 // px — fish notice predator within this

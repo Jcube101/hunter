@@ -5,7 +5,20 @@ import { theme } from '../constants/theme.js'
 
 const PB_KEY = 'hunter_pb'
 
-export default function StartScreen({ onPlay, onLeaderboard, muted, onToggleMute }) {
+const DIFFICULTIES = [
+  ['easy', 'Easy'],
+  ['normal', 'Normal'],
+  ['hardcore', 'Hardcore'],
+]
+
+export default function StartScreen({
+  onPlay,
+  onLeaderboard,
+  muted,
+  onToggleMute,
+  difficulty,
+  onSelectDifficulty,
+}) {
   const [personalBest, setPersonalBest] = useState(null)
 
   useEffect(() => {
@@ -49,6 +62,31 @@ export default function StartScreen({ onPlay, onLeaderboard, muted, onToggleMute
         >
           Sky <span className="ml-1 text-xs opacity-70">v2</span>
         </button>
+      </div>
+
+      {/* Difficulty selector — single select, persisted in localStorage */}
+      <div className="flex flex-col items-center gap-1.5">
+        <span className="text-xs uppercase tracking-widest text-slate-500">Difficulty</span>
+        <div className="flex items-center gap-2">
+          {DIFFICULTIES.map(([value, label]) => {
+            const selected = difficulty === value
+            return (
+              <button
+                key={value}
+                onClick={() => onSelectDifficulty(value)}
+                aria-pressed={selected}
+                className="rounded-lg border-2 px-4 py-1.5 text-sm font-semibold transition active:scale-95"
+                style={
+                  selected
+                    ? { borderColor: theme.accent, color: theme.accent }
+                    : { borderColor: '#334155', color: '#94a3b8' }
+                }
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <div className="mt-2 flex flex-col items-center gap-3">

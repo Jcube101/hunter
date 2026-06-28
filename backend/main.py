@@ -61,6 +61,7 @@ def init_db():
                 name        TEXT    NOT NULL,
                 score       INTEGER NOT NULL,
                 theme       TEXT    NOT NULL DEFAULT 'ocean',
+                difficulty  TEXT    NOT NULL DEFAULT 'normal',
                 created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
@@ -72,7 +73,7 @@ def fetch_top(limit=TOP_N):
     with get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT id, name, score, theme, created_at
+            SELECT id, name, score, theme, difficulty, created_at
             FROM leaderboard
             ORDER BY score DESC, created_at ASC
             LIMIT ?
@@ -82,12 +83,12 @@ def fetch_top(limit=TOP_N):
     return [dict(row) for row in rows]
 
 
-def insert_entry(name, score, theme):
+def insert_entry(name, score, theme, difficulty):
     """Insert a single leaderboard row."""
     with get_connection() as conn:
         conn.execute(
-            "INSERT INTO leaderboard (name, score, theme) VALUES (?, ?, ?)",
-            (name, score, theme),
+            "INSERT INTO leaderboard (name, score, theme, difficulty) VALUES (?, ?, ?, ?)",
+            (name, score, theme, difficulty),
         )
 
 
@@ -97,6 +98,7 @@ class LeaderboardEntry(BaseModel):
     name: str = Field(..., min_length=1, max_length=20)
     score: int = Field(..., ge=0, le=MAX_SCORE)
     theme: str = Field(default="ocean")
+    difficulty: str = Field(default="normal")
 
     @field_validator("name")
     @classmethod
@@ -112,6 +114,14 @@ class LeaderboardEntry(BaseModel):
         # v1 ships Ocean only (see GDD.md). Reject unknown themes.
         if v != "ocean":
             raise ValueError("theme must be 'ocean' in v1")
+        return v
+
+    @field_validator("difficulty")
+    @classmethod
+    def validate_difficulty(cls, v):
+        v = v.lower()
+        if v not in {"easy", "normal", "hardcore"}:
+            raise ValueError("difficulty must be easy, normal, or hardcore")
         return v
 
 
@@ -131,7 +141,7 @@ def get_leaderboard():
 @app.post("/api/leaderboard", status_code=201)
 def post_leaderboard(entry: LeaderboardEntry):
     """Opt-in submit. Only called when a player chooses to add their score."""
-    insert_entry(entry.name, entry.score, entry.theme)
+    insert_entry(entry.name, entry.score, entry.theme, entry.difficulty)
     return {"status": "added"}
 
 

@@ -33,7 +33,8 @@ import {
   WORLD_WIDTH_MULTIPLIER,
   WORLD_HEIGHT_MULTIPLIER,
   GAME_DURATION,
-  SHARK_SPEED,
+  DIFFICULTY_SPEEDS,
+  DEFAULT_DIFFICULTY,
   HITBOX_RADIUS,
   SHARK_MOUTH_OFFSET,
   SHAKE_FRAMES,
@@ -44,6 +45,7 @@ import {
 } from './constants/boids.js'
 
 const PB_KEY = 'hunter_pb'
+const DIFFICULTY_KEY = 'hunter_difficulty'
 
 export default function App() {
   const [screen, setScreen] = useState('start') // start | playing | paused | end
@@ -52,6 +54,19 @@ export default function App() {
     stateRef.current = s
     setScreen(s)
   }, [])
+
+  // Difficulty (shark speed only). Persisted; locked into sharkSpeedRef at game
+  // start so it can't change mid-game.
+  const [difficulty, setDifficulty] = useState(() => {
+    const stored = localStorage.getItem(DIFFICULTY_KEY)
+    return stored && DIFFICULTY_SPEEDS[stored] ? stored : DEFAULT_DIFFICULTY
+  })
+  const selectDifficulty = useCallback((d) => {
+    if (!DIFFICULTY_SPEEDS[d]) return
+    setDifficulty(d)
+    localStorage.setItem(DIFFICULTY_KEY, d)
+  }, [])
+  const sharkSpeedRef = useRef(DIFFICULTY_SPEEDS[DEFAULT_DIFFICULTY])
 
   // Canvas + minimap elements
   const canvasRef = useRef(null)
@@ -125,9 +140,9 @@ export default function App() {
     let vx = 0
     let vy = 0
     if (dist > 0) {
-      // Frame-normalized step so the shark covers SHARK_SPEED px per 60Hz frame
-      // regardless of refresh rate; never overshoot the target.
-      const step = Math.min(SHARK_SPEED * dt, dist)
+      // Frame-normalized step so the shark covers its (difficulty-set) speed per
+      // 60Hz frame regardless of refresh rate; never overshoot the target.
+      const step = Math.min(sharkSpeedRef.current * dt, dist)
       vx = (dx / dist) * step
       vy = (dy / dist) * step
     }
@@ -234,6 +249,9 @@ export default function App() {
   const startGame = useCallback(async () => {
     soundRef.current.playAmbient() // unlock audio inside the Play gesture, start drone
 
+    // Lock the difficulty speed for this game (selector is start-screen only).
+    sharkSpeedRef.current = DIFFICULTY_SPEEDS[difficulty]
+
     await enter() // fullscreen + landscape lock (best effort)
 
     sizeCanvas() // HiDPI backing store + viewportRef (CSS pixels)
@@ -270,7 +288,7 @@ export default function App() {
     setGameState('playing')
     start()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enter, init, start, setGameState, sizeCanvas])
+  }, [enter, init, start, setGameState, sizeCanvas, difficulty])
 
   function pauseGame() {
     stop()
@@ -345,6 +363,7 @@ export default function App() {
         worldRef,
         cameraRef,
         inputPosRef,
+        sharkSpeedRef,
       }
     }
   }, [predatorRef, fishRef, worldRef, inputPosRef])
@@ -357,7 +376,9 @@ export default function App() {
       <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
 
       {isGameView && <Minimap ref={minimapRef} width={minimapSize.width} height={minimapSize.height} />}
-      {screen === 'playing' && <HUD score={displayScore} timeLeft={displayTime} />}
+      {screen === 'playing' && (
+        <HUD score={displayScore} timeLeft={displayTime} difficulty={difficulty} />
+      )}
 
       {screen === 'start' && (
         <StartScreen
@@ -365,6 +386,8 @@ export default function App() {
           onLeaderboard={() => {}} // start-screen leaderboard overlay — not in v1
           muted={sound.muted}
           onToggleMute={sound.toggleMute}
+          difficulty={difficulty}
+          onSelectDifficulty={selectDifficulty}
         />
       )}
       {screen === 'paused' && <PauseScreen onResume={resumeGame} onQuit={quitGame} />}
@@ -373,6 +396,7 @@ export default function App() {
           score={endData.score}
           personalBest={endData.personalBest}
           isNewPB={endData.isNewPB}
+          difficulty={difficulty}
           onPlayAgain={startGame}
         />
       )}

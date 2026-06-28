@@ -11,6 +11,8 @@ import { theme, ACTIVE_THEME } from '../constants/theme.js'
 const MAX_NAME_LENGTH = 20
 const TOP_PREVIEW = 5
 
+const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : '')
+
 async function getLeaderboard() {
   const res = await fetch('/api/leaderboard')
   if (!res.ok) throw new Error(`GET failed (${res.status})`)
@@ -41,9 +43,12 @@ function LeaderboardList({ status, entries, limit }) {
           key={e.id ?? `${e.name}-${i}`}
           className="flex items-center justify-between rounded-md bg-slate-800/50 px-3 py-1.5 text-sm"
         >
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
             <span className="w-5 text-right font-mono text-slate-500">{i + 1}</span>
-            <span className="text-slate-100">{e.name}</span>
+            <span className="truncate text-slate-100">{e.name}</span>
+            {e.difficulty && (
+              <span className="shrink-0 text-xs text-slate-500">{cap(e.difficulty)}</span>
+            )}
           </span>
           <span className="font-semibold tabular-nums" style={{ color: theme.accent }}>
             {e.score}
@@ -54,7 +59,7 @@ function LeaderboardList({ status, entries, limit }) {
   )
 }
 
-export default function EndScreen({ score, personalBest, isNewPB, onPlayAgain }) {
+export default function EndScreen({ score, personalBest, isNewPB, difficulty, onPlayAgain }) {
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [entries, setEntries] = useState([])
   const [name, setName] = useState('')
@@ -81,7 +86,7 @@ export default function EndScreen({ score, personalBest, isNewPB, onPlayAgain })
     if (!trimmed) return
     setSubmitState('posting')
     try {
-      await postScore({ name: trimmed, score, theme: ACTIVE_THEME })
+      await postScore({ name: trimmed, score, theme: ACTIVE_THEME, difficulty })
       setSubmitState('done')
       load() // refresh so the player sees their entry
     } catch {
@@ -94,6 +99,11 @@ export default function EndScreen({ score, personalBest, isNewPB, onPlayAgain })
       <h2 className="text-4xl font-bold text-slate-100 sm:text-5xl">
         You caught <span style={{ color: theme.accent }}>{score}</span> fish
       </h2>
+      {difficulty && (
+        <p className="-mt-3 text-sm font-medium uppercase tracking-wider text-slate-500">
+          {cap(difficulty)} mode
+        </p>
+      )}
 
       <p className="text-sm text-slate-400">
         Personal best: <span className="font-semibold text-slate-200">{personalBest}</span>
