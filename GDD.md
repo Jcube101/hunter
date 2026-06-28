@@ -56,16 +56,21 @@ Start Screen
 
 ## Difficulty Modes
 
-Selected on the start screen before Play is tapped. Affects shark speed only.
-All other Boids parameters are identical across difficulties.
+Selected on the start screen before Play is tapped. Controls fish behavior only —
+shark speed is identical across all modes (3.8). The player's skill is constant;
+fish intelligence scales.
 
-| Mode | SHARK_SPEED | Intent |
-|---|---|---|
-| Easy | 4.0 | Shark matches flee speed — forgiving for new players |
-| Normal | 3.8 | Shark slightly slower than fleeing fish — default, requires interception |
-| Hardcore | 3.6 | Shark noticeably slower — pure patience and positioning |
+| Mode | FLEE_WEIGHT | FLEE_RADIUS | Effect |
+|---|---|---|---|
+| Easy | 2.0 | 80px | Fish react less aggressively, scatter less |
+| Normal | 3.0 | 100px | Default behavior |
+| Hardcore | 4.0 | 120px | Fish notice you earlier, scatter explosively |
 
 Default: Normal. Selection persisted in localStorage key `hunter_difficulty`.
+
+Design rationale: a faster shark triggers flee earlier and harder — fish scatter
+wider, making them harder to catch. Difficulty must scale fish intelligence,
+not shark speed.
 
 ---
 
@@ -159,9 +164,10 @@ Never hardcode these values inline anywhere else.
 
 ### Movement
 - **Desktop:** Mouse position = predator target. Predator moves toward cursor.
-- **Mobile:** Touch position = target. Predator moves toward finger.
-- **Offset (mobile):** Predator renders ~80px above the touch point so the
-  player's finger never obscures the predator or its catch zone.
+- **Mobile:** Fixed virtual joystick, bottom-left corner. Thumb stays in one
+  place. Shark moves in joystick direction proportional to stick displacement.
+  Max displacement = JOYSTICK_RADIUS. Shark speed scales with displacement
+  (0 at center, full SHARK_SPEED at rim).
 - **Speed:** 3.8 px/frame. Faster than prey base speed but not flee speed —
   player must be tactical, not just fast.
 - **Edge:** Hard stop at world boundary.
@@ -321,7 +327,7 @@ brief reason (see CONTRIBUTING.md "Tuning Discipline").
 | `FISH_COUNT_DESKTOP` | 50 | |
 | `FISH_BASE_SPEED` | 2.5 | px/frame |
 | `FISH_FLEE_SPEED` | 4.0 | px/frame — at predator contact |
-| `SHARK_SPEED` | 3.8 | Baseline (Normal). Easy=4.0, Hardcore=3.6 — set dynamically from difficulty selection (see Difficulty Modes). |
+| `SHARK_SPEED` | 3.8 | px/frame — constant across all difficulty modes |
 | `FLEE_RADIUS` | 100 | px — fish notice predator within this (tightened from 120 so the player can get closer before scatter) |
 | `FLEE_WEIGHT` | 3.0 | Dominates all other forces |
 | `SEPARATION_RADIUS` | 25 | px |

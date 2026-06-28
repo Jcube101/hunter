@@ -36,7 +36,7 @@ hunter/                              ← repo root
             hooks/
                 useGameLoop.js       ← requestAnimationFrame loop
                 useBoids.js          ← simulation state + update logic
-                useInput.js          ← mouse + touch unified input
+                useInput.js          ← mouse (desktop) + virtual joystick (mobile). Joystick: fixed bottom-left, touch controls direction + speed via displacement. Mouse: direct world coordinate tracking, unchanged from previous sessions.
                 useSound.js          ← Tone.js audio — ambient drone, catch sfx, timer-end, mute toggle
                 useFullscreen.js     ← Fullscreen API + orientation lock
             constants/
