@@ -20,6 +20,7 @@ import { useBoids } from './hooks/useBoids.js'
 import { useInput } from './hooks/useInput.js'
 import { useFullscreen } from './hooks/useFullscreen.js'
 import { useGameLoop } from './hooks/useGameLoop.js'
+import { useSound } from './hooks/useSound.js'
 
 import { updateCamera } from './game/camera.js'
 import { drawBackground, drawFish, drawShark, drawMinimap } from './game/renderer.js'
@@ -89,6 +90,12 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const { enter, exit } = useFullscreen(handleFullscreenExit)
+
+  // Sound (Tone.js). Kept in a ref so the rAF loop can trigger SFX without
+  // re-subscribing; the lifecycle handlers use it too.
+  const sound = useSound()
+  const soundRef = useRef(sound)
+  soundRef.current = sound
 
   // Size the main canvas backing store for HiDPI: CSS pixels * devicePixelRatio.
   // The 2D context is scaled (in onFrameDraw) so all drawing + game coordinates
@@ -164,6 +171,7 @@ export default function App() {
       if (caughtAny) {
         fishRef.current = survivors
         shakeRef.current = SHAKE_FRAMES
+        soundRef.current.playCatch() // after grace (catch block is grace-gated)
         setDisplayScore(scoreRef.current) // event-driven state sync
       }
     }
@@ -224,6 +232,8 @@ export default function App() {
 
   // --- Game lifecycle --------------------------------------------------------
   const startGame = useCallback(async () => {
+    soundRef.current.playAmbient() // unlock audio inside the Play gesture, start drone
+
     await enter() // fullscreen + landscape lock (best effort)
 
     sizeCanvas() // HiDPI backing store + viewportRef (CSS pixels)
@@ -264,11 +274,13 @@ export default function App() {
 
   function pauseGame() {
     stop()
+    soundRef.current.stopAmbient()
     setGameState('paused')
   }
 
   const resumeGame = useCallback(async () => {
     await enter()
+    soundRef.current.playAmbient()
     setGameState('playing')
     start()
   }, [enter, start, setGameState])
@@ -276,12 +288,15 @@ export default function App() {
   const quitGame = useCallback(() => {
     stop()
     exit()
+    soundRef.current.stopAmbient()
     setGameState('start')
   }, [stop, exit, setGameState])
 
   function endGame() {
     stop()
     exit()
+    soundRef.current.stopAmbient()
+    soundRef.current.playEnd()
     const stored = parseInt(localStorage.getItem(PB_KEY) ?? '-1', 10)
     const prevPB = Number.isNaN(stored) ? -1 : stored
     const score = scoreRef.current
@@ -347,7 +362,9 @@ export default function App() {
       {screen === 'start' && (
         <StartScreen
           onPlay={startGame}
-          onLeaderboard={() => {}} // leaderboard overlay deferred to Session 3
+          onLeaderboard={() => {}} // start-screen leaderboard overlay — not in v1
+          muted={sound.muted}
+          onToggleMute={sound.toggleMute}
         />
       )}
       {screen === 'paused' && <PauseScreen onResume={resumeGame} onQuit={quitGame} />}

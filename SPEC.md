@@ -37,7 +37,7 @@ hunter/                              ← repo root
                 useGameLoop.js       ← requestAnimationFrame loop
                 useBoids.js          ← simulation state + update logic
                 useInput.js          ← mouse + touch unified input
-                useSound.js          ← Tone.js audio management  # stub only — implemented in Session 3
+                useSound.js          ← Tone.js audio — ambient drone, catch sfx, timer-end, mute toggle
                 useFullscreen.js     ← Fullscreen API + orientation lock
             constants/
                 boids.js             ← ALL tuning parameters (see GDD.md)
