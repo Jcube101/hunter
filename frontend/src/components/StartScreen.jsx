@@ -14,6 +14,7 @@ const DIFFICULTIES = [
 export default function StartScreen({
   onPlay,
   onLeaderboard,
+  onHowToPlay,
   muted,
   onToggleMute,
   difficulty,
@@ -102,6 +103,12 @@ export default function StartScreen({
           className="rounded-xl border border-slate-600 px-8 py-2 text-sm font-semibold text-slate-200 transition active:scale-95"
         >
           Leaderboard
+        </button>
+        <button
+          onClick={onHowToPlay}
+          className="text-sm font-medium text-slate-400 underline-offset-4 transition hover:underline active:scale-95"
+        >
+          How to play
         </button>
       </div>
 

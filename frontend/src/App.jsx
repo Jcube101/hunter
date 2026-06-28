@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import StartScreen from './components/StartScreen.jsx'
 import EndScreen from './components/EndScreen.jsx'
 import PauseScreen from './components/PauseScreen.jsx'
+import Tutorial from './components/Tutorial.jsx'
 import HUD from './components/HUD.jsx'
 import Minimap from './components/Minimap.jsx'
 
@@ -51,6 +52,11 @@ const TUTORIAL_KEY = 'hunter_tutorial_seen'
 
 export default function App() {
   const [screen, setScreen] = useState('start') // start | playing | paused | end
+  // First-play tutorial overlay (shown over the start screen). Auto-shows once
+  // on first visit; re-triggerable via the start screen's "How to play" link.
+  const [showTutorial, setShowTutorial] = useState(
+    () => localStorage.getItem(TUTORIAL_KEY) !== 'true',
+  )
   const stateRef = useRef('start')
   const setGameState = useCallback((s) => {
     stateRef.current = s
@@ -417,11 +423,16 @@ export default function App() {
         <StartScreen
           onPlay={startGame}
           onLeaderboard={() => {}} // start-screen leaderboard overlay — not in v1
+          onHowToPlay={() => setShowTutorial(true)}
           muted={sound.muted}
           onToggleMute={sound.toggleMute}
           difficulty={difficulty}
           onSelectDifficulty={selectDifficulty}
         />
+      )}
+      {/* First-play tutorial — over the start screen only. */}
+      {screen === 'start' && showTutorial && (
+        <Tutorial onDone={() => setShowTutorial(false)} />
       )}
       {screen === 'paused' && <PauseScreen onResume={resumeGame} onQuit={quitGame} />}
       {screen === 'end' && (
