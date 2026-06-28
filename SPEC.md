@@ -183,9 +183,13 @@ WantedBy=multi-user.target
 
 ## API Contracts
 
-### GET /api/leaderboard
+### GET /api/leaderboard?difficulty=easy|normal|hardcore
 
-Returns global top 10 scores, ordered by score descending.
+Returns the top 10 scores **for that difficulty**, ordered by score descending.
+
+- `difficulty` query param is **required** — `easy`, `normal`, or `hardcore`.
+- Missing or invalid `difficulty` → **400**.
+- Empty array if no entries for that difficulty.
 
 **Response 200:**
 ```json
@@ -195,12 +199,13 @@ Returns global top 10 scores, ordered by score descending.
     "name": "Job",
     "score": 23,
     "theme": "ocean",
+    "difficulty": "easy",
     "created_at": "2026-06-28T10:30:00"
   }
 ]
 ```
 
-Always returns an array. Empty array if no entries yet. Max 10 items.
+Always returns an array. Max 10 items.
 
 ---
 
@@ -214,7 +219,8 @@ chooses to add their score.
 {
   "name": "Job",
   "score": 23,
-  "theme": "ocean"
+  "theme": "ocean",
+  "difficulty": "easy"
 }
 ```
 
@@ -222,6 +228,7 @@ chooses to add their score.
 - `name`: string, 1–20 characters, stripped of leading/trailing whitespace
 - `score`: integer, 0–50 (capped at FISH_COUNT_DESKTOP as sanity check)
 - `theme`: enum — `"ocean"` only in v1
+- `difficulty`: enum — `easy` / `normal` / `hardcore` (defaults to `normal`)
 
 **Response 201:**
 ```json
@@ -270,6 +277,8 @@ data is not critical).
 |---|---|---|---|
 | `hunter_pb` | localStorage | integer | On game end if score > current PB |
 | `hunter_mute` | localStorage | `"true"` / `"false"` | On mute toggle |
+| `hunter_difficulty` | localStorage | `easy` / `normal` / `hardcore` | On difficulty select |
+| `hunter_tutorial_seen` | localStorage | `"true"` | After tutorial completed or skipped |
 
 No cookies. No session storage. No IndexedDB.
 

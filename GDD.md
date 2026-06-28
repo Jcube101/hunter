@@ -168,9 +168,18 @@ Never hardcode these values inline anywhere else.
   place. Shark moves in joystick direction proportional to stick displacement.
   Max displacement = JOYSTICK_RADIUS. Shark speed scales with displacement
   (0 at center, full SHARK_SPEED at rim).
+- **Joystick parameters:**
+  - `JOYSTICK_RADIUS`: 60px
+  - `JOYSTICK_MARGIN`: 40px (from left and bottom edges — was 20px)
+  - Base ring opacity: 0.4 (was 0.2)
+  - Knob opacity: 0.6 (was 0.4)
 - **Speed:** 3.8 px/frame. Faster than prey base speed but not flee speed —
   player must be tactical, not just fast.
 - **Edge:** Hard stop at world boundary.
+
+### Rendering
+- Shark rendered at 56×28px (was 40×20px) — `SHARK_MOUTH_OFFSET` = 28px (half
+  the body length) keeps the visual front tip aligned with the catch point.
 
 ### Orientation
 - Predator sprite always rotates to face direction of travel
@@ -246,6 +255,8 @@ Never hardcode these values inline anywhere else.
 - **Timer** — top-right, minimal, red pulse under 10s
 - **Minimap** — bottom-right corner overlay
 - No other UI during gameplay
+- Canvas rendering stops completely when game ends — game loop halted,
+  canvas hidden behind end screen overlay. Fish must not render behind UI.
 
 ### Pause Screen (back gesture / fullscreen exit)
 - Semi-transparent overlay on canvas
@@ -258,13 +269,39 @@ Never hardcode these values inline anywhere else.
 - **Personal best** — pulled from localStorage
 - If new personal best: **"New personal best! 🎉"**
 - If new PB: **"Add to leaderboard?"** → name input (max 20 chars) → Submit
-- **Global top 5 preview** (fetched from API)
+- **Top 5 preview for the difficulty just played** (fetched from API)
 - **Play Again** button
-- **Full Leaderboard** button
+- **Full Leaderboard** button (three tabs: Easy / Normal / Hardcore)
+
+---
+
+## First-Play Tutorial
+
+Shown once only — on first ever visit (no `hunter_tutorial_seen` in localStorage).
+Three-slide overlay, shown before the start screen.
+Swipeable left/right, skip button top-right.
+
+Slide 1: "Chase the school" — illustration of shark approaching fish
+Slide 2: "Use the joystick" — illustration of thumb on joystick bottom-left
+Slide 3: "Catch as many as you can in 60 seconds" — score counter illustration
+
+After last slide or skip: set localStorage `hunter_tutorial_seen` = true.
+Never shown again. Accessible again via "How to play" link on start screen.
 
 ---
 
 ## Leaderboard
+
+Three separate leaderboards — one per difficulty mode. Easy, Normal, and
+Hardcore scores are never compared against each other. Comparing Easy 34
+to Hardcore 8 is meaningless — each mode has its own ranked list.
+
+End screen shows the leaderboard for the difficulty mode just played.
+Full leaderboard view has three tabs: Easy / Normal / Hardcore.
+Default tab on full leaderboard: the mode just played.
+
+API: GET /api/leaderboard?difficulty=easy|normal|hardcore
+     POST /api/leaderboard — unchanged, difficulty field already stored
 
 ### Storage
 - **Personal best:** localStorage key `hunter_pb` — score as integer.
@@ -294,11 +331,13 @@ CREATE TABLE IF NOT EXISTS leaderboard (
 ### API Endpoints
 
 ```text
-GET  /api/leaderboard    → top 10 scores [{name, score, theme, created_at}]
-POST /api/leaderboard    → {name, score, theme} → 201 on success
+GET  /api/leaderboard?difficulty=easy|normal|hardcore
+                         → top 10 for that difficulty, score desc
+                         → difficulty param required; missing/invalid → 400
+POST /api/leaderboard    → {name, score, theme, difficulty} → 201 on success
 ```
 
-Top 10 only. No pagination. No delete. No auth.
+Top 10 per difficulty. No pagination. No delete. No auth.
 
 ---
 
