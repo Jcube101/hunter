@@ -39,7 +39,7 @@ export const ALIGNMENT_WEIGHT = 1.0
 
 // --- Cohesion (drift toward group center) ---
 export const COHESION_RADIUS = 100 // px
-export const COHESION_WEIGHT = 1.4
+export const COHESION_WEIGHT = 1.1 // reduced from 1.4 — school was too tight, easy to herd
 
 // --- Anchor (weak constant pull toward world center; applied every frame) ---
 export const ANCHOR_WEIGHT = 0.02 // very subtle — was 0.05, too strong (school clumped)
