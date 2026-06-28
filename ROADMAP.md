@@ -23,6 +23,7 @@ Ocean theme only. Live at [hunter.job-joseph.com](https://hunter.job-joseph.com)
 - ✅ **Sound** — ambient loop, catch, and timer-end (Tone.js), with persisted mute toggle
 - ✅ **Personal best** — stored in `localStorage`
 - ✅ **Leaderboard** — opt-in submit on new PB; global top 10 via FastAPI + SQLite
+- ✅ **Difficulty modes** — Easy / Normal / Hardcore (shark speed 4.0 / 3.8 / 3.6)
 
 ---
 
@@ -33,7 +34,7 @@ Committed direction, out of scope for v1.
 - **Sky theme** — eagle predator + bird murmuration (shares v1 physics)
 - **Combo multiplier** — 2× for 2 catches within 1.5s, 3× for 3, etc.
 - **Option B mode** — play as a fish and survive the predator
-- **Difficulty select** — start-screen option adjusting flee weight + fish speed
+- **Screensaver / attract mode** — autonomous shark patrol as animated start screen background. Shark wanders by itself, fish flee naturally. "Tap to play" overlay on top. Shows the Boids algorithm in pure form before the player takes control.
 - **Mobile haptics** — vibration feedback on catch
 - **Particle variety per theme**
 - **Background parallax layers**

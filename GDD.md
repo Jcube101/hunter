@@ -54,6 +54,21 @@ Start Screen
 
 ---
 
+## Difficulty Modes
+
+Selected on the start screen before Play is tapped. Affects shark speed only.
+All other Boids parameters are identical across difficulties.
+
+| Mode | SHARK_SPEED | Intent |
+|---|---|---|
+| Easy | 4.0 | Shark matches flee speed — forgiving for new players |
+| Normal | 3.8 | Shark slightly slower than fleeing fish — default, requires interception |
+| Hardcore | 3.6 | Shark noticeably slower — pure patience and positioning |
+
+Default: Normal. Selection persisted in localStorage key `hunter_difficulty`.
+
+---
+
 ## Win / Loss Conditions
 
 - **Time limit:** 60 seconds. Game ends when timer hits zero.
@@ -285,7 +300,7 @@ Mute state persisted in localStorage key `hunter_mute`.
 
 | Sound | Trigger | Character |
 |---|---|---|
-| Ambient loop | Game running | Underwater hum, subtle |
+| Ambient loop | Game running | Light atmospheric texture, 400–800Hz range — non-haunting, suggests water without being eerie |
 | Catch | Fish caught | Short satisfying chomp |
 | Timer end | 0:00 reached | Distinct, recognisable end tone |
 
@@ -306,7 +321,7 @@ brief reason (see CONTRIBUTING.md "Tuning Discipline").
 | `FISH_COUNT_DESKTOP` | 50 | |
 | `FISH_BASE_SPEED` | 2.5 | px/frame |
 | `FISH_FLEE_SPEED` | 4.0 | px/frame — at predator contact |
-| `SHARK_SPEED` | 3.8 | Lowered from 4.5 → 3.8 so fleeing fish outrun a direct chase. Design intent: intercept, don't chase. |
+| `SHARK_SPEED` | 3.8 | Baseline (Normal). Easy=4.0, Hardcore=3.6 — set dynamically from difficulty selection (see Difficulty Modes). |
 | `FLEE_RADIUS` | 100 | px — fish notice predator within this (tightened from 120 so the player can get closer before scatter) |
 | `FLEE_WEIGHT` | 3.0 | Dominates all other forces |
 | `SEPARATION_RADIUS` | 25 | px |
@@ -314,7 +329,7 @@ brief reason (see CONTRIBUTING.md "Tuning Discipline").
 | `ALIGNMENT_RADIUS` | 60 | px |
 | `ALIGNMENT_WEIGHT` | 1.0 | |
 | `COHESION_RADIUS` | 100 | px — wider cohesion pull (from 80) |
-| `COHESION_WEIGHT` | 1.4 | School should regroup after scatter, not stay dispersed (from 1.0) |
+| `COHESION_WEIGHT` | 1.1 | Reduced post-playtest — school was too tight, easy to herd once learned |
 | `ANCHOR_WEIGHT` | 0.02 | Weak center-pull — lowered from 0.05 (too strong, school clumped unnaturally) |
 | `EDGE_REPULSION_RADIUS` | 120 | px from world boundary — raised from 80 so fish turn earlier, stay central |
 | `EDGE_REPULSION_WEIGHT` | 3.0 | Raised from 2.0 to compensate for weaker anchor — fish avoid walls more aggressively | |
