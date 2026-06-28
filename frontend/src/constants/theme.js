@@ -20,9 +20,11 @@ export const THEMES = {
     },
     // Grey shark — triangle body + fin
     shark: {
-      body: '#8a96a3',
-      fin: '#5c6670',
-      outline: '#2c333a',
+      body: '#c0c0c0', // light grey body
+      underside: '#a0a0a0', // slightly darker belly
+      fin: '#c0c0c0', // dorsal + tail fins, same grey as body
+      eye: '#15181c', // near-black eye
+      outline: '#8a8a8a', // subtle edge definition
     },
     // Bubble burst on catch
     particle: {

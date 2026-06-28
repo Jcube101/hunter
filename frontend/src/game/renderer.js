@@ -44,34 +44,67 @@ export function drawFish(ctx, fishList, camera, theme) {
   }
 }
 
-// Grey shark: triangular body + dorsal fin. Mouth point is the front tip.
+// Canvas-drawn shark, facing +X in local space (the rotate transform handles
+// heading). All shapes are positioned so the snout/front tip sits at
+// SHARK_MOUTH_OFFSET — the same point the catch check uses.
 export function drawShark(ctx, predator, camera, theme) {
   const s = worldToScreen(predator.x, predator.y, camera)
+  const sk = theme.shark
+  const nose = SHARK_MOUTH_OFFSET // front tip x — aligns visual with catch point
+
   ctx.save()
   ctx.translate(s.x, s.y)
   ctx.rotate(headingOf(predator))
 
-  // Dorsal fin (drawn first, behind the body edge)
-  ctx.fillStyle = theme.shark.fin
+  // --- Tail fin: two angled triangles forming a crescent (drawn first) ---
+  ctx.fillStyle = sk.fin
   ctx.beginPath()
-  ctx.moveTo(-2, -6)
-  ctx.lineTo(-9, -16)
-  ctx.lineTo(2, -6)
+  ctx.moveTo(-14, -1) // upper lobe
+  ctx.lineTo(-25, -9)
+  ctx.lineTo(-18, 0)
+  ctx.closePath()
+  ctx.moveTo(-14, 1) // lower lobe
+  ctx.lineTo(-24, 8)
+  ctx.lineTo(-18, 0)
   ctx.closePath()
   ctx.fill()
 
-  // Body triangle — front tip at (16, 0) is the mouth point.
-  ctx.fillStyle = theme.shark.body
-  ctx.strokeStyle = theme.shark.outline
-  ctx.lineWidth = 1.5
+  // --- Dorsal fin: back-swept triangle from the top center ---
   ctx.beginPath()
-  ctx.moveTo(SHARK_MOUTH_OFFSET, 0) // mouth / front tip — matches the catch point
-  ctx.lineTo(-11, -8)
-  ctx.lineTo(-7, 0)
-  ctx.lineTo(-11, 8)
+  ctx.moveTo(2, -6)
+  ctx.lineTo(-8, -16)
+  ctx.lineTo(-6, -6)
   ctx.closePath()
   ctx.fill()
+
+  // --- Body: streamlined ellipse, front tip at the nose ---
+  ctx.fillStyle = sk.body
+  ctx.strokeStyle = sk.outline
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.ellipse(nose - 16, 0, 16, 6.5, 0, 0, Math.PI * 2)
+  ctx.fill()
   ctx.stroke()
+
+  // --- Underside: darker belly ellipse on the lower half ---
+  ctx.fillStyle = sk.underside
+  ctx.beginPath()
+  ctx.ellipse(nose - 17, 3, 12, 3.2, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // --- Mouth: subtle open-mouth line at the very front tip ---
+  ctx.strokeStyle = sk.outline
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(nose, 0.5)
+  ctx.lineTo(nose - 6, 2.5)
+  ctx.stroke()
+
+  // --- Eye: small dark circle toward the front ---
+  ctx.fillStyle = sk.eye
+  ctx.beginPath()
+  ctx.arc(nose - 6, -1.8, 1.3, 0, Math.PI * 2)
+  ctx.fill()
 
   ctx.restore()
 }
