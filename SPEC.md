@@ -44,7 +44,7 @@ hunter/                              ← repo root
                 theme.js             ← Ocean color palette + sprite config
             game/
                 boids.js             ← Boids update functions (pure JS, no React)
-                renderer.js          ← Canvas draw functions  # drawHUD() was removed — HUD is React (see React/Canvas boundary)
+                renderer.js          ← Canvas draw functions  # drawHUD() was removed — HUD is React (see React/Canvas boundary); shark is a multi-shape canvas sprite (body ellipse + fins + eye), no image files
                 particles.js         ← Particle system
                 camera.js            ← Camera/viewport transform
             App.jsx                  ← Screen router (start → game → end)

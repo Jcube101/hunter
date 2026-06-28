@@ -26,7 +26,7 @@ Two themes share identical physics. Only sprites, colors, and particles differ.
 |---|---|---|
 | Background | Dark navy `#0a1628` | Dusk gradient `#1a1a2e → #e8956d` |
 | Prey | Silver/white chevron fish | Small V-shape birds |
-| Predator | Grey shark (triangle + fin) | Brown eagle (larger V-shape) |
+| Predator | Canvas-drawn shark — streamlined body ellipse, dorsal fin triangle, tail fin, darker underside. Pure canvas shapes, no image files. Rotates smoothly with movement direction. | Brown eagle (larger V-shape) |
 | Particles on catch | Bubble burst | Feather burst |
 | Ambient | Faint caustic light pattern | Faint cloud shapes |
 
