@@ -32,25 +32,33 @@ export function useInput(canvasRef, cameraRef) {
       inputPosRef.current = toWorld(e.clientX, e.clientY, 0)
     }
 
-    const onTouchStart = (e) => {
+    // touchstart and touchmove do exactly the same thing, so the shark begins
+    // chasing the moment a finger lands and keeps chasing continuously as it
+    // drags. Both preventDefault to suppress page scroll/zoom during gameplay.
+    const updateFromTouch = (e) => {
+      e.preventDefault()
       const t = e.touches[0]
       if (t) inputPosRef.current = toWorld(t.clientX, t.clientY, SHARK_OFFSET_MOBILE)
     }
 
-    const onTouchMove = (e) => {
-      e.preventDefault() // suppress page scroll during gameplay
-      const t = e.touches[0]
-      if (t) inputPosRef.current = toWorld(t.clientX, t.clientY, SHARK_OFFSET_MOBILE)
+    // Finger lifted/cancelled — stop chasing; App holds the shark in place when
+    // inputPosRef is null.
+    const onTouchEnd = () => {
+      inputPosRef.current = null
     }
 
     canvas.addEventListener('mousemove', onMouseMove)
-    canvas.addEventListener('touchstart', onTouchStart, { passive: false })
-    canvas.addEventListener('touchmove', onTouchMove, { passive: false })
+    canvas.addEventListener('touchstart', updateFromTouch, { passive: false })
+    canvas.addEventListener('touchmove', updateFromTouch, { passive: false })
+    canvas.addEventListener('touchend', onTouchEnd)
+    canvas.addEventListener('touchcancel', onTouchEnd)
 
     return () => {
       canvas.removeEventListener('mousemove', onMouseMove)
-      canvas.removeEventListener('touchstart', onTouchStart)
-      canvas.removeEventListener('touchmove', onTouchMove)
+      canvas.removeEventListener('touchstart', updateFromTouch)
+      canvas.removeEventListener('touchmove', updateFromTouch)
+      canvas.removeEventListener('touchend', onTouchEnd)
+      canvas.removeEventListener('touchcancel', onTouchEnd)
     }
   }, [canvasRef, cameraRef])
 
