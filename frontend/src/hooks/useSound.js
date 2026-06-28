@@ -1,8 +1,9 @@
 // useSound.js — Tone.js audio. This is the ONLY file that imports Tone.
 //
-// Three generated sounds: a subtle ambient underwater drone (while playing), a
-// short catch chomp, and a distinct descending game-over tone. A mute toggle
-// (persisted in localStorage) gates everything at the destination.
+// Three generated sounds: a mid-range ambient underwater burble (while playing,
+// audible on phone speakers), a short catch chomp, and a distinct descending
+// game-over tone. A mute toggle (persisted in localStorage) gates everything at
+// the destination.
 //
 // The AudioContext must be unlocked inside a user gesture — playAmbient() is
 // first called from the Play tap (see App.startGame), which satisfies that.
@@ -11,7 +12,9 @@ import { useCallback, useRef, useState } from 'react'
 import * as Tone from 'tone'
 
 const MUTE_KEY = 'hunter_mute'
-const AMBIENT_LEVEL = 0.09 // linear gain ≈ -21 dB — barely-there atmosphere
+const AMBIENT_LEVEL = 0.12 // linear gain ≈ -18 dB — present on phone speakers, not intrusive
+const AMBIENT_FREQ_MIN = 400 // Hz — carrier wavers across this range (mid, phone-audible)
+const AMBIENT_FREQ_MAX = 470
 
 export function useSound() {
   const [muted, setMuted] = useState(() => localStorage.getItem(MUTE_KEY) === 'true')
@@ -25,12 +28,17 @@ export function useSound() {
     if (nodesRef.current) return
     await Tone.start()
 
-    // Ambient: low sine drone through an on/off gain, with a slow frequency
-    // waver (LFO) for an underwater feel.
+    // Ambient: a mid-range underwater "burble". A ~420Hz sine is pulsed by a
+    // slow tremolo (rhythmic, watery) with a gentle pitch waver. Mid frequencies
+    // carry on small phone speakers, unlike the old ~68Hz sub-bass drone that
+    // was inaudible on mobile. Routed through an on/off gain for play/stop.
     const ambientVol = new Tone.Gain(0).toDestination()
-    const ambientOsc = new Tone.Oscillator(68, 'sine').connect(ambientVol)
+    const ambientTrem = new Tone.Tremolo({ frequency: 3.2, depth: 0.85, spread: 0 })
+      .connect(ambientVol)
+      .start()
+    const ambientOsc = new Tone.Oscillator(420, 'sine').connect(ambientTrem)
     ambientOsc.start()
-    const ambientLfo = new Tone.LFO({ frequency: 0.1, min: 64, max: 72 }).start()
+    const ambientLfo = new Tone.LFO({ frequency: 0.15, min: AMBIENT_FREQ_MIN, max: AMBIENT_FREQ_MAX }).start()
     ambientLfo.connect(ambientOsc.frequency)
 
     // Catch: short percussive chomp.
@@ -57,6 +65,9 @@ export function useSound() {
         state: () => Tone.getContext().state,
         muted: () => Tone.getDestination().mute,
         ambientGain: () => ambientVol.gain.value,
+        // Carrier value reads 0 while an LFO drives the param (Web Audio quirk),
+        // so report the true emitted midpoint of the LFO waver range instead.
+        ambientFreq: () => (AMBIENT_FREQ_MIN + AMBIENT_FREQ_MAX) / 2,
       }
     }
   }, [])
