@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* Global resets for a fullscreen canvas game — no scroll, no text selection,
+   no tap-highlight on mobile. The canvas owns the whole viewport. */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0a1628;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+/* The game canvas suppresses default touch gestures (scroll/zoom) during play. */
+canvas {
+  display: block;
+  touch-action: none;
+}

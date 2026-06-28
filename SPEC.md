@@ -12,7 +12,7 @@
 |---|---|---|
 | Game engine | HTML Canvas (vanilla JS) | 60fps with 50+ agents requires direct canvas control — no React re-renders in the game loop |
 | Frontend framework | React 18 + Vite 6 | UI shells only (start/end/pause screens) — game loop runs outside React |
-| Styling | Tailwind CSS 3 | UI screens only — canvas styled directly |
+| Styling | Tailwind CSS 4 | UI screens only — canvas styled directly |
 | Backend | FastAPI (Python 3.11) | Standard Pi stack, serves both API and static frontend |
 | Database | SQLite 3 | Single-table leaderboard, no concurrent writes, no migration complexity |
 | Audio | Tone.js | Generated sounds, no audio file hosting needed |
@@ -142,7 +142,7 @@ def health(): return {"status": "ok"}
 
 # --- Static files LAST — always ---
 # Mounting before API routes causes StaticFiles to intercept /api/* → 404
-app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
+app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="frontend")
 ```
 
 ### No CORS

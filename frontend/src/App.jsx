@@ -1,0 +1,324 @@
+// App.jsx — screen router + game orchestrator.
+//
+// Screen states: start -> playing -> paused -> end. The <canvas> is always
+// mounted (behind the UI) so input listeners and its 2D context persist across
+// state changes; React screens render as overlays on top of it.
+//
+// The game loop (onFrameUpdate/onFrameDraw) runs entirely on refs and the
+// canvas — it never calls setState except on meaningful events (catch -> score,
+// each whole second -> timer). This is the React/Canvas boundary from SPEC.md.
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import StartScreen from './components/StartScreen.jsx'
+import EndScreen from './components/EndScreen.jsx'
+import PauseScreen from './components/PauseScreen.jsx'
+import HUD from './components/HUD.jsx'
+import Minimap from './components/Minimap.jsx'
+
+import { useBoids } from './hooks/useBoids.js'
+import { useInput } from './hooks/useInput.js'
+import { useFullscreen } from './hooks/useFullscreen.js'
+import { useGameLoop } from './hooks/useGameLoop.js'
+
+import { updateCamera } from './game/camera.js'
+import { drawBackground, drawFish, drawShark, drawMinimap } from './game/renderer.js'
+import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
+import { theme } from './constants/theme.js'
+import {
+  FISH_COUNT_MOBILE,
+  FISH_COUNT_DESKTOP,
+  MOBILE_BREAKPOINT,
+  WORLD_WIDTH_MULTIPLIER,
+  WORLD_HEIGHT_MULTIPLIER,
+  GAME_DURATION,
+  SHARK_SPEED,
+  HITBOX_RADIUS,
+  SHARK_MOUTH_OFFSET,
+  SHAKE_FRAMES,
+  SHAKE_OFFSET,
+  ROTATION_VELOCITY_THRESHOLD,
+  MINIMAP_VIEWPORT_FRACTION,
+} from './constants/boids.js'
+
+const PB_KEY = 'hunter_pb'
+
+export default function App() {
+  const [screen, setScreen] = useState('start') // start | playing | paused | end
+  const stateRef = useRef('start')
+  const setGameState = useCallback((s) => {
+    stateRef.current = s
+    setScreen(s)
+  }, [])
+
+  // Canvas + minimap elements
+  const canvasRef = useRef(null)
+  const minimapRef = useRef(null)
+  const cameraRef = useRef(null)
+  const [minimapSize, setMinimapSize] = useState({ width: 0, height: 0 })
+
+  // Simulation state (refs). `tickBoids` advances the school one frame using
+  // the current predator (already updated by movePredator each frame).
+  const { fishRef, predatorRef, worldRef, init, update: tickBoids } = useBoids()
+
+  // Game refs that must not trigger re-renders each frame
+  const scoreRef = useRef(0)
+  const timeLeftRef = useRef(GAME_DURATION)
+  const lastSecondRef = useRef(GAME_DURATION)
+  const particlesRef = useRef([])
+  const shakeRef = useRef(0)
+
+  // HUD display state (synced only on events)
+  const [displayScore, setDisplayScore] = useState(0)
+  const [displayTime, setDisplayTime] = useState(GAME_DURATION)
+
+  // End-screen data
+  const [endData, setEndData] = useState({ score: 0, personalBest: 0, isNewPB: false })
+
+  // Input + fullscreen
+  const { inputPosRef } = useInput(canvasRef, cameraRef)
+  const handleFullscreenExit = useCallback(() => {
+    // System/back-gesture fullscreen exit during play -> pause.
+    if (stateRef.current === 'playing') pauseGame()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const { enter, exit } = useFullscreen(handleFullscreenExit)
+
+  // --- Predator movement -----------------------------------------------------
+  const movePredator = useCallback(() => {
+    const p = predatorRef.current
+    const world = worldRef.current
+    const target = inputPosRef.current || { x: p.x, y: p.y }
+
+    const dx = target.x - p.x
+    const dy = target.y - p.y
+    const dist = Math.hypot(dx, dy)
+
+    let vx = 0
+    let vy = 0
+    if (dist > 0) {
+      const step = Math.min(SHARK_SPEED, dist)
+      vx = (dx / dist) * step
+      vy = (dy / dist) * step
+    }
+
+    let nx = p.x + vx
+    let ny = p.y + vy
+    // Hard stop at world bounds (GDD.md): zero the velocity that hit the wall.
+    if (nx < 0) { nx = 0; vx = 0 } else if (nx > world.width) { nx = world.width; vx = 0 }
+    if (ny < 0) { ny = 0; vy = 0 } else if (ny > world.height) { ny = world.height; vy = 0 }
+
+    let angle = p.angle
+    if (Math.hypot(vx, vy) > ROTATION_VELOCITY_THRESHOLD) angle = Math.atan2(vy, vx)
+
+    predatorRef.current = { x: nx, y: ny, vx, vy, angle }
+  }, [predatorRef, worldRef, inputPosRef])
+
+  // --- Per-frame update ------------------------------------------------------
+  const onFrameUpdate = useCallback((dt) => {
+    movePredator()
+    tickBoids()
+
+    const canvas = canvasRef.current
+    cameraRef.current = updateCamera(predatorRef.current, worldRef.current, {
+      width: canvas.width,
+      height: canvas.height,
+    })
+
+    // Catch detection: mouth point vs each fish center.
+    const p = predatorRef.current
+    const mouthX = p.x + Math.cos(p.angle) * SHARK_MOUTH_OFFSET
+    const mouthY = p.y + Math.sin(p.angle) * SHARK_MOUTH_OFFSET
+    const survivors = []
+    let caughtAny = false
+    for (const f of fishRef.current) {
+      if (Math.hypot(mouthX - f.x, mouthY - f.y) < HITBOX_RADIUS) {
+        particlesRef.current = particlesRef.current.concat(spawnParticles(f.x, f.y))
+        scoreRef.current += 1
+        caughtAny = true
+      } else {
+        survivors.push(f)
+      }
+    }
+    if (caughtAny) {
+      fishRef.current = survivors
+      shakeRef.current = SHAKE_FRAMES
+      setDisplayScore(scoreRef.current) // event-driven state sync
+    }
+
+    particlesRef.current = updateParticles(particlesRef.current)
+
+    // Timer (real wall-clock seconds). Sync display only on second boundaries.
+    timeLeftRef.current -= dt
+    const whole = Math.max(0, Math.ceil(timeLeftRef.current))
+    if (whole !== lastSecondRef.current) {
+      lastSecondRef.current = whole
+      setDisplayTime(whole)
+    }
+
+    if (timeLeftRef.current <= 0 || fishRef.current.length === 0) {
+      endGame()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movePredator, tickBoids])
+
+  // --- Per-frame draw --------------------------------------------------------
+  const onFrameDraw = useCallback(() => {
+    const canvas = canvasRef.current
+    const cam = cameraRef.current
+    if (!canvas || !cam) return
+    const ctx = canvas.getContext('2d')
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    // Background fills the whole canvas first so screen shake never exposes a gap.
+    drawBackground(ctx, { width: canvas.width, height: canvas.height }, theme)
+
+    ctx.save()
+    if (shakeRef.current > 0) {
+      ctx.translate(
+        (Math.random() * 2 - 1) * SHAKE_OFFSET,
+        (Math.random() * 2 - 1) * SHAKE_OFFSET,
+      )
+      shakeRef.current -= 1
+    }
+    drawFish(ctx, fishRef.current, cam, theme)
+    drawShark(ctx, predatorRef.current, cam, theme)
+    drawParticles(ctx, particlesRef.current, cam)
+    ctx.restore()
+
+    // Minimap on its own canvas (no shake).
+    const mm = minimapRef.current
+    if (mm) {
+      drawMinimap(mm.getContext('2d'), fishRef.current, predatorRef.current, worldRef.current, theme)
+    }
+  }, [fishRef, predatorRef, worldRef])
+
+  const { start, stop } = useGameLoop(onFrameUpdate, onFrameDraw)
+
+  // --- Game lifecycle --------------------------------------------------------
+  const startGame = useCallback(async () => {
+    await enter() // fullscreen + landscape lock (best effort)
+
+    const canvas = canvasRef.current
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+
+    const world = {
+      width: canvas.width * WORLD_WIDTH_MULTIPLIER,
+      height: canvas.height * WORLD_HEIGHT_MULTIPLIER,
+    }
+    const count = window.innerWidth < MOBILE_BREAKPOINT ? FISH_COUNT_MOBILE : FISH_COUNT_DESKTOP
+    init(count, world)
+
+    // Minimap sized to ~15% viewport width, proportional to world aspect.
+    const mmW = Math.round(canvas.width * MINIMAP_VIEWPORT_FRACTION)
+    const mmH = Math.round(mmW * (world.height / world.width))
+    setMinimapSize({ width: mmW, height: mmH })
+
+    // Reset game refs.
+    scoreRef.current = 0
+    timeLeftRef.current = GAME_DURATION
+    lastSecondRef.current = GAME_DURATION
+    particlesRef.current = []
+    shakeRef.current = 0
+    inputPosRef.current = { x: world.width / 2, y: world.height / 2 }
+    cameraRef.current = updateCamera(predatorRef.current, world, {
+      width: canvas.width,
+      height: canvas.height,
+    })
+
+    setDisplayScore(0)
+    setDisplayTime(GAME_DURATION)
+    setGameState('playing')
+    start()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enter, init, start, setGameState])
+
+  function pauseGame() {
+    stop()
+    setGameState('paused')
+  }
+
+  const resumeGame = useCallback(async () => {
+    await enter()
+    setGameState('playing')
+    start()
+  }, [enter, start, setGameState])
+
+  const quitGame = useCallback(() => {
+    stop()
+    exit()
+    setGameState('start')
+  }, [stop, exit, setGameState])
+
+  function endGame() {
+    stop()
+    exit()
+    const stored = parseInt(localStorage.getItem(PB_KEY) ?? '-1', 10)
+    const prevPB = Number.isNaN(stored) ? -1 : stored
+    const score = scoreRef.current
+    const isNewPB = score > prevPB
+    if (isNewPB) localStorage.setItem(PB_KEY, String(score))
+    setEndData({ score, personalBest: isNewPB ? score : prevPB, isNewPB })
+    setGameState('end')
+  }
+
+  // Escape pauses on desktop (also covers the case where fullscreen was denied).
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape' && stateRef.current === 'playing') pauseGame()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Dev-only test hook: expose live game refs for browser verification.
+  // Vite replaces import.meta.env.DEV with false in production and strips this.
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      window.__hunter = {
+        stateRef,
+        scoreRef,
+        timeLeftRef,
+        shakeRef,
+        predatorRef,
+        fishRef,
+        worldRef,
+        cameraRef,
+        inputPosRef,
+      }
+    }
+  }, [predatorRef, fishRef, worldRef, inputPosRef])
+
+  const isGameView = screen === 'playing' || screen === 'paused'
+
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      {/* Always-mounted game canvas, behind the UI overlays. */}
+      <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
+
+      {isGameView && <Minimap ref={minimapRef} width={minimapSize.width} height={minimapSize.height} />}
+      {screen === 'playing' && <HUD score={displayScore} timeLeft={displayTime} />}
+
+      {screen === 'start' && (
+        <StartScreen
+          onPlay={startGame}
+          onLeaderboard={() => {}} // leaderboard overlay deferred to Session 3
+        />
+      )}
+      {screen === 'paused' && <PauseScreen onResume={resumeGame} onQuit={quitGame} />}
+      {screen === 'end' && (
+        <EndScreen
+          score={endData.score}
+          personalBest={endData.personalBest}
+          isNewPB={endData.isNewPB}
+          onPlayAgain={startGame}
+          // onSubmitScore / onShowLeaderboard wired in Session 3
+        />
+      )}
+    </div>
+  )
+}
