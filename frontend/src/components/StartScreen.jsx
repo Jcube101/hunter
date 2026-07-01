@@ -20,6 +20,9 @@ export default function StartScreen({
   onSelectDifficulty,
 }) {
   const [personalBest, setPersonalBest] = useState(null)
+  // Compact layout for constrained heights (landscape phones) so nothing clips
+  // or scrolls. Portrait/desktop keep the normal layout unchanged.
+  const [isCompact, setIsCompact] = useState(() => window.innerHeight < 500)
 
   // Show the PB for the currently selected difficulty; updates when the player
   // switches difficulty. Each mode has its own key (hunter_pb_<difficulty>).
@@ -28,8 +31,22 @@ export default function StartScreen({
     setPersonalBest(stored !== null ? parseInt(stored, 10) : null)
   }, [difficulty])
 
+  useEffect(() => {
+    const handler = () => setIsCompact(window.innerHeight < 500)
+    window.addEventListener('resize', handler)
+    window.addEventListener('orientationchange', handler)
+    return () => {
+      window.removeEventListener('resize', handler)
+      window.removeEventListener('orientationchange', handler)
+    }
+  }, [])
+
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 px-6 text-center">
+    <div
+      className={`absolute inset-0 flex flex-col items-center justify-center px-6 text-center ${
+        isCompact ? 'gap-2' : 'gap-6'
+      }`}
+    >
       {/* Settings — top-left, gear icon */}
       <button
         onClick={onOpenSettings}
@@ -49,13 +66,15 @@ export default function StartScreen({
       </button>
 
       <h1
-        className="text-6xl font-extrabold tracking-[0.2em] sm:text-7xl"
+        className={`font-extrabold tracking-[0.2em] ${
+          isCompact ? 'text-3xl' : 'text-6xl sm:text-7xl'
+        }`}
         style={{ color: theme.accent }}
       >
         HUNTER
       </h1>
 
-      <p className="max-w-sm text-base text-slate-300">
+      <p className={`max-w-sm text-slate-300 ${isCompact ? 'text-sm' : 'text-base'}`}>
         Chase the school. Catch as many as you can.
       </p>
 
@@ -100,10 +119,12 @@ export default function StartScreen({
         </div>
       </div>
 
-      <div className="mt-2 flex flex-col items-center gap-3">
+      <div className={`flex flex-col items-center ${isCompact ? 'mt-0 gap-1.5' : 'mt-2 gap-3'}`}>
         <button
           onClick={onPlay}
-          className="rounded-xl px-12 py-3 text-lg font-bold text-slate-900 transition active:scale-95"
+          className={`rounded-xl px-12 text-lg font-bold text-slate-900 transition active:scale-95 ${
+            isCompact ? 'py-2' : 'py-3'
+          }`}
           style={{ backgroundColor: theme.accent }}
         >
           Play
@@ -128,7 +149,9 @@ export default function StartScreen({
         </p>
       )}
 
-      <p className="absolute bottom-6 text-xs text-slate-500">Best played in landscape</p>
+      {!isCompact && (
+        <p className="absolute bottom-6 text-xs text-slate-500">Best played in landscape</p>
+      )}
     </div>
   )
 }
