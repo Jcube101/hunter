@@ -23,7 +23,7 @@ import { useFullscreen } from './hooks/useFullscreen.js'
 import { useGameLoop } from './hooks/useGameLoop.js'
 import { useSound } from './hooks/useSound.js'
 
-import { updateCamera } from './game/camera.js'
+import { updateCamera, worldToScreen } from './game/camera.js'
 import { drawBackground, drawSchool, drawShark, drawMinimap, drawJoystick } from './game/renderer.js'
 import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
 import { theme } from './constants/theme.js'
@@ -261,7 +261,8 @@ export default function App() {
       fleeSettingsRef.current.FLEE_RADIUS,
       settingsRef.current,
     )
-    drawShark(ctx, predatorRef.current, cam, theme)
+    const ss = worldToScreen(predatorRef.current.x, predatorRef.current.y, cam)
+    drawShark(ctx, ss.x, ss.y, predatorRef.current.angle)
     drawParticles(ctx, particlesRef.current, cam)
     ctx.restore()
 

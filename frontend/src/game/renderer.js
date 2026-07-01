@@ -83,75 +83,64 @@ export function drawSchool(ctx, fishList, camera, predator, fleeRadius, settings
   }
 }
 
-// Canvas-drawn shark, facing +X in local space (the rotate transform handles
-// heading). All shapes are positioned so the snout/front tip sits at
-// SHARK_MOUTH_OFFSET — the same point the catch check uses.
-// The silhouette below was authored with its front tip at local x = AUTHORED_NOSE.
-// We scale the whole sprite uniformly so that tip lands exactly on the real catch
-// point (SHARK_MOUTH_OFFSET world px). Bumping SHARK_MOUTH_OFFSET enlarges the
-// shark while keeping every proportion and the tip↔catch-point alignment.
-const AUTHORED_NOSE = 16 // px — front tip in the silhouette's authored units
-
-export function drawShark(ctx, predator, camera, theme) {
-  const s = worldToScreen(predator.x, predator.y, camera)
-  const sk = theme.shark
-  const nose = AUTHORED_NOSE // front tip x in authored units (scaled to the catch point below)
-
+// Dark angular predator silhouette, drawn at (x, y) facing `angle`. Coordinate-
+// agnostic like drawFish (game passes screen coords, tutorial passes canvas
+// coords). The nose sits at local x = 28 = SHARK_MOUTH_OFFSET, so the visual
+// front tip lands exactly on the catch point (camera is 1:1). Pure angular
+// shapes — no grey ellipse; a small teal eye gives contrast against the navy.
+export function drawShark(ctx, x, y, angle) {
   ctx.save()
-  ctx.translate(s.x, s.y)
-  ctx.rotate(headingOf(predator))
-  // Uniform scale: authored tip (AUTHORED_NOSE) -> SHARK_MOUTH_OFFSET world px.
-  const scale = SHARK_MOUTH_OFFSET / AUTHORED_NOSE
-  ctx.scale(scale, scale)
+  ctx.translate(x, y)
+  ctx.rotate(angle)
 
-  // --- Tail fin: two angled triangles forming a crescent (drawn first) ---
-  ctx.fillStyle = sk.fin
-  ctx.beginPath()
-  ctx.moveTo(-14, -1) // upper lobe
-  ctx.lineTo(-25, -9)
-  ctx.lineTo(-18, 0)
-  ctx.closePath()
-  ctx.moveTo(-14, 1) // lower lobe
-  ctx.lineTo(-24, 8)
-  ctx.lineTo(-18, 0)
-  ctx.closePath()
-  ctx.fill()
-
-  // --- Dorsal fin: back-swept triangle from the top center ---
-  ctx.beginPath()
-  ctx.moveTo(2, -6)
-  ctx.lineTo(-8, -16)
-  ctx.lineTo(-6, -6)
-  ctx.closePath()
-  ctx.fill()
-
-  // --- Body: streamlined ellipse, front tip at the nose ---
-  ctx.fillStyle = sk.body
-  ctx.strokeStyle = sk.outline
+  ctx.fillStyle = '#0d1f2d'
+  ctx.strokeStyle = '#1a3a4a'
   ctx.lineWidth = 1
+
+  // Main body — angular, not rounded (nose = front tip = mouth point).
   ctx.beginPath()
-  ctx.ellipse(nose - 16, 0, 16, 6.5, 0, 0, Math.PI * 2)
+  ctx.moveTo(28, 0)
+  ctx.lineTo(8, -8)
+  ctx.lineTo(-20, -6)
+  ctx.lineTo(-28, 0)
+  ctx.lineTo(-20, 6)
+  ctx.lineTo(8, 8)
+  ctx.closePath()
   ctx.fill()
   ctx.stroke()
 
-  // --- Underside: darker belly ellipse on the lower half ---
-  ctx.fillStyle = sk.underside
+  // Dorsal fin — tall, raked back.
   ctx.beginPath()
-  ctx.ellipse(nose - 17, 3, 12, 3.2, 0, 0, Math.PI * 2)
+  ctx.moveTo(4, -8)
+  ctx.lineTo(0, -22)
+  ctx.lineTo(-14, -6)
+  ctx.closePath()
   ctx.fill()
-
-  // --- Mouth: subtle open-mouth line at the very front tip ---
-  ctx.strokeStyle = sk.outline
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(nose, 0.5)
-  ctx.lineTo(nose - 6, 2.5)
   ctx.stroke()
 
-  // --- Eye: small dark circle toward the front ---
-  ctx.fillStyle = sk.eye
+  // Tail fin — crescent.
   ctx.beginPath()
-  ctx.arc(nose - 6, -1.8, 1.3, 0, Math.PI * 2)
+  ctx.moveTo(-20, -6)
+  ctx.lineTo(-36, -16)
+  ctx.lineTo(-28, 0)
+  ctx.lineTo(-36, 16)
+  ctx.lineTo(-20, 6)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+
+  // Pectoral fin — angular sweep.
+  ctx.beginPath()
+  ctx.moveTo(6, 8)
+  ctx.lineTo(0, 18)
+  ctx.lineTo(-12, 8)
+  ctx.closePath()
+  ctx.fill()
+
+  // Eye — small teal dot for contrast.
+  ctx.beginPath()
+  ctx.arc(16, -3, 2, 0, Math.PI * 2)
+  ctx.fillStyle = '#00BCD4'
   ctx.fill()
 
   ctx.restore()
