@@ -226,7 +226,7 @@ chooses to add their score.
 
 **Validation:**
 - `name`: string, 1–20 characters, stripped of leading/trailing whitespace
-- `score`: integer, 0–50 (capped at FISH_COUNT_DESKTOP as sanity check)
+- `score`: integer, 0–70 (`Field(..., ge=0, le=70)` — Easy now spawns 70 fish)
 - `theme`: enum — `"ocean"` only in v1
 - `difficulty`: enum — `easy` / `normal` / `hardcore` (defaults to `normal`)
 
@@ -279,6 +279,8 @@ data is not critical).
 | `hunter_mute` | localStorage | `"true"` / `"false"` | On mute toggle |
 | `hunter_difficulty` | localStorage | `easy` / `normal` / `hardcore` | On difficulty select |
 | `hunter_tutorial_seen` | localStorage | `"true"` | After tutorial completed or skipped |
+| `hunter_setting_flee_radius` | localStorage | `"false"` | Flee radius circle toggle |
+| `hunter_setting_glow` | localStorage | `"false"` | Glow on fleeing fish toggle |
 
 No cookies. No session storage. No IndexedDB.
 

@@ -60,17 +60,65 @@ Selected on the start screen before Play is tapped. Controls fish behavior only 
 shark speed is identical across all modes (3.8). The player's skill is constant;
 fish intelligence scales.
 
-| Mode | FLEE_WEIGHT | FLEE_RADIUS | Effect |
-|---|---|---|---|
-| Easy | 2.0 | 80px | Fish react less aggressively, scatter less |
-| Normal | 3.0 | 100px | Default behavior |
-| Hardcore | 4.0 | 120px | Fish notice you earlier, scatter explosively |
+| Mode | Fish Count | FLEE_WEIGHT | FLEE_RADIUS | Effect |
+|---|---|---|---|---|
+| Easy | 70 | 2.5 | 90px | More targets, slightly less panicky |
+| Normal | 60 | 3.0 | 100px | Default behavior |
+| Hardcore | 50 | 4.0 | 120px | Fewer fish, explosive scatter |
 
 Default: Normal. Selection persisted in localStorage key `hunter_difficulty`.
 
 Design rationale: a faster shark triggers flee earlier and harder — fish scatter
 wider, making them harder to catch. Difficulty must scale fish intelligence,
 not shark speed.
+
+Fish count scales inversely with difficulty — Easy has more targets but
+fish are calmer; Hardcore has fewer but each is explosively harder to catch.
+The prestige condition (catching all fish) is genuinely hard on all modes.
+Device-based fish count (30 mobile / 50 desktop) removed — the landscape
+lock made mobile equivalent to desktop, breaking the split.
+
+---
+
+## Fish Sprites
+
+Shape: diamond/lens — a pointed oval with a small v-notch tail.
+Larger and more elegant than the previous chevron.
+
+Color states:
+- Calm: white/silver #E8EDF0 — school not within flee radius
+- Fleeing: teal #00BCD4 — fish within FLEE_RADIUS of predator
+- Glow on fleeing: canvas shadowBlur in teal, settings-gated (default off)
+
+---
+
+## Predator Sprite
+
+Dark angular silhouette — very dark navy-black #0d1f2d.
+Sharp angular fins, menacing against the #0a1628 background.
+Front tip is the catch point — must align with SHARK_MOUTH_OFFSET.
+No grey ellipse — pure angular canvas shapes.
+
+---
+
+## Settings Panel
+
+Accessible via gear icon (⚙) on start screen, top-left corner.
+Full-screen overlay, same dark navy background.
+Settings persisted in localStorage.
+
+### Visual Assists (v1 — default off)
+These are built in Session 8 but default to off. They may become
+unlockable features via coins system in v2.
+
+| Setting | Key | Default | Description |
+|---|---|---|---|
+| Flee radius circle | hunter_setting_flee_radius | false | Faint teal ring around predator showing detection range |
+| Glow on fleeing fish | hunter_setting_glow | false | Canvas shadowBlur on teal fish while fleeing |
+
+### v2 Settings (not built yet)
+- Fleeing fish color selection (teal default, pink, gold, red)
+- Sound volume slider
 
 ---
 
@@ -339,6 +387,9 @@ POST /api/leaderboard    → {name, score, theme, difficulty} → 201 on success
 
 Top 10 per difficulty. No pagination. No delete. No auth.
 
+POST /api/leaderboard score max: 70 (was 50) — Easy now spawns 70 fish, so
+the max possible score is 70.
+
 ---
 
 ## Sound Design
@@ -400,3 +451,15 @@ brief reason (see CONTRIBUTING.md "Tuning Discipline").
 - Particle variety per theme
 - Background parallax layers
 - Mobile haptic feedback on catch
+
+### Meta-progression (Coins)
+- Earn 1 coin per fish caught, persisted in localStorage
+- Spend coins to unlock visual assists:
+  - Flee radius circle: 50 coins
+  - Glow on fleeing fish: 100 coins
+- Once unlocked, available as settings toggles
+- Adds depth without paywalls
+
+### Visual Customisation
+- Fleeing fish color options in settings: teal (default), pink, gold, red
+- Purely cosmetic, no gameplay change

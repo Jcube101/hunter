@@ -38,6 +38,8 @@ Committed direction, out of scope for v1.
 - **Mobile haptics** — vibration feedback on catch
 - **Particle variety per theme**
 - **Background parallax layers**
+- **Meta-progression coins system** — earn coins per catch, spend to unlock flee radius circle (50 coins) and glow on fleeing fish (100 coins)
+- **Fleeing fish color options in settings** — teal default, pink, gold, red
 
 ---
 
