@@ -28,25 +28,58 @@ export function drawBackground(ctx, viewport, theme) {
   ctx.fillRect(0, 0, viewport.width, viewport.height)
 }
 
-// Silver/white chevron, rotated to face its heading.
-export function drawFish(ctx, fishList, camera, theme) {
-  ctx.fillStyle = theme.fish.fill
-  ctx.strokeStyle = theme.fish.stroke
-  ctx.lineWidth = 1
+const FISH_CALM_COLOR = '#E8EDF0' // white/silver — not within flee radius
+const FISH_FLEE_COLOR = '#00BCD4' // teal — within FLEE_RADIUS of the predator
+const FISH_GLOW_BLUR = 8 // shadowBlur px when the glow assist is on
+
+// One fish, drawn at (x, y) facing `angle`. Coordinate-agnostic: the game passes
+// screen coords (camera-transformed), the tutorial passes canvas coords. Diamond/
+// lens body with a v-notch tail; teal when fleeing, white/silver when calm. Glow
+// only when settings.glow is on AND the fish is fleeing.
+export function drawFish(ctx, x, y, angle, isFleeing, settings = {}) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(angle)
+
+  const W = 10 // half-length
+  const H = 4 // half-height
+
+  ctx.beginPath()
+  ctx.moveTo(W, 0) // nose
+  ctx.quadraticCurveTo(W * 0.3, H, -W * 0.5, H * 0.8) // top curve
+  ctx.lineTo(-W, 0) // tail center
+  ctx.lineTo(-W * 0.5, -H * 0.8)
+  ctx.quadraticCurveTo(W * 0.3, -H, W, 0) // bottom curve
+  ctx.closePath()
+
+  // V-notch tail
+  ctx.moveTo(-W * 0.5, H * 0.8)
+  ctx.lineTo(-W * 1.3, H * 1.2)
+  ctx.lineTo(-W, 0)
+  ctx.lineTo(-W * 1.3, -H * 1.2)
+  ctx.lineTo(-W * 0.5, -H * 0.8)
+
+  ctx.fillStyle = isFleeing ? FISH_FLEE_COLOR : FISH_CALM_COLOR
+  if (isFleeing && settings.glow) {
+    ctx.shadowColor = FISH_FLEE_COLOR
+    ctx.shadowBlur = FISH_GLOW_BLUR
+  } else {
+    ctx.shadowBlur = 0
+  }
+  ctx.fill()
+  ctx.restore()
+}
+
+// Draw the whole school through the camera. Colours each fish by whether it is
+// within `fleeRadius` (the current difficulty's FLEE_RADIUS) of the predator.
+export function drawSchool(ctx, fishList, camera, predator, fleeRadius, settings) {
+  const fr2 = fleeRadius * fleeRadius
   for (const fish of fishList) {
     const s = worldToScreen(fish.x, fish.y, camera)
-    ctx.save()
-    ctx.translate(s.x, s.y)
-    ctx.rotate(headingOf(fish))
-    ctx.beginPath()
-    ctx.moveTo(7, 0) // nose
-    ctx.lineTo(-5, -5) // upper tail
-    ctx.lineTo(-2, 0) // chevron notch
-    ctx.lineTo(-5, 5) // lower tail
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-    ctx.restore()
+    const dx = fish.x - predator.x
+    const dy = fish.y - predator.y
+    const isFleeing = dx * dx + dy * dy < fr2
+    drawFish(ctx, s.x, s.y, headingOf(fish), isFleeing, settings)
   }
 }
 

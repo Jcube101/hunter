@@ -7,9 +7,14 @@
 //
 // Never hardcode any of these values inline anywhere else in the codebase.
 
-// --- Fish counts (determined once at game start, no respawning) ---
-export const FISH_COUNT_MOBILE = 30 // viewport width < 768px
-export const FISH_COUNT_DESKTOP = 50
+// --- Fish counts (determined once at game start by difficulty, no respawning) ---
+// Device-based split (30 mobile / 50 desktop) removed — the landscape lock makes
+// mobile equivalent to desktop. Count now scales inversely with difficulty.
+export const FISH_COUNT = {
+  easy: 70, // more targets, calmer fish
+  normal: 60,
+  hardcore: 50, // fewer fish, explosive scatter
+}
 
 // --- Speeds (px/frame) ---
 export const FISH_BASE_SPEED = 2.5
@@ -21,7 +26,7 @@ export const SHARK_SPEED = 3.8 // px/frame — constant across all difficulty mo
 // shark always moves at SHARK_SPEED. Normal mirrors the FLEE_WEIGHT/FLEE_RADIUS
 // defaults below.
 export const DIFFICULTY_SETTINGS = {
-  easy: { FLEE_WEIGHT: 2.0, FLEE_RADIUS: 80 }, // react less, scatter less — forgiving
+  easy: { FLEE_WEIGHT: 2.5, FLEE_RADIUS: 90 }, // react less, scatter less — forgiving
   normal: { FLEE_WEIGHT: 3.0, FLEE_RADIUS: 100 }, // default behavior
   hardcore: { FLEE_WEIGHT: 4.0, FLEE_RADIUS: 120 }, // notice earlier, scatter explosively
 }

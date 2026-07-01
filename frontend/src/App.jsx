@@ -24,12 +24,11 @@ import { useGameLoop } from './hooks/useGameLoop.js'
 import { useSound } from './hooks/useSound.js'
 
 import { updateCamera } from './game/camera.js'
-import { drawBackground, drawFish, drawShark, drawMinimap, drawJoystick } from './game/renderer.js'
+import { drawBackground, drawSchool, drawShark, drawMinimap, drawJoystick } from './game/renderer.js'
 import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
 import { theme } from './constants/theme.js'
 import {
-  FISH_COUNT_MOBILE,
-  FISH_COUNT_DESKTOP,
+  FISH_COUNT,
   MOBILE_BREAKPOINT,
   WORLD_WIDTH_MULTIPLIER,
   WORLD_HEIGHT_MULTIPLIER,
@@ -49,6 +48,8 @@ import {
 const PB_KEY = 'hunter_pb'
 const DIFFICULTY_KEY = 'hunter_difficulty'
 const TUTORIAL_KEY = 'hunter_tutorial_seen'
+const SETTING_FLEE_KEY = 'hunter_setting_flee_radius'
+const SETTING_GLOW_KEY = 'hunter_setting_glow'
 
 export default function App() {
   const [screen, setScreen] = useState('start') // start | playing | paused | end
@@ -76,6 +77,9 @@ export default function App() {
     localStorage.setItem(DIFFICULTY_KEY, d)
   }, [])
   const fleeSettingsRef = useRef(DIFFICULTY_SETTINGS[DEFAULT_DIFFICULTY])
+  // Visual-assist settings (flee-radius circle, glow), read from localStorage at
+  // game start and frozen for the game — changing them takes effect next game.
+  const settingsRef = useRef({ fleeRadius: false, glow: false })
 
   // Canvas + minimap elements
   const canvasRef = useRef(null)
@@ -249,7 +253,14 @@ export default function App() {
       )
       shakeRef.current -= 1
     }
-    drawFish(ctx, fishRef.current, cam, theme)
+    drawSchool(
+      ctx,
+      fishRef.current,
+      cam,
+      predatorRef.current,
+      fleeSettingsRef.current.FLEE_RADIUS,
+      settingsRef.current,
+    )
     drawShark(ctx, predatorRef.current, cam, theme)
     drawParticles(ctx, particlesRef.current, cam)
     ctx.restore()
@@ -280,6 +291,12 @@ export default function App() {
     // Show the joystick hint only until the tutorial has been seen.
     joystickHintRef.current = localStorage.getItem(TUTORIAL_KEY) !== 'true'
 
+    // Snapshot the visual-assist settings for this game (frozen for its duration).
+    settingsRef.current = {
+      fleeRadius: localStorage.getItem(SETTING_FLEE_KEY) === 'true',
+      glow: localStorage.getItem(SETTING_GLOW_KEY) === 'true',
+    }
+
     await enter() // fullscreen + landscape lock (best effort)
 
     sizeCanvas() // HiDPI backing store + viewportRef (CSS pixels)
@@ -289,7 +306,7 @@ export default function App() {
       width: vp.width * WORLD_WIDTH_MULTIPLIER,
       height: vp.height * WORLD_HEIGHT_MULTIPLIER,
     }
-    const count = vp.width < MOBILE_BREAKPOINT ? FISH_COUNT_MOBILE : FISH_COUNT_DESKTOP
+    const count = FISH_COUNT[difficulty]
     init(count, world)
 
     // Minimap sized to ~15% viewport width, proportional to world aspect.
@@ -395,6 +412,7 @@ export default function App() {
         inputPosRef,
         joystickRef,
         fleeSettingsRef,
+        settingsRef,
         sharkSpeed: SHARK_SPEED,
       }
     }
