@@ -26,8 +26,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "leaderboard.db")
 DIST_DIR = os.path.join(BASE_DIR, "..", "frontend", "dist")
 
-# Score sanity cap mirrors FISH_COUNT_DESKTOP in the frontend constants.
-MAX_SCORE = 50
+# Score sanity cap = the largest fish count across difficulties (Easy = 70).
+MAX_SCORE = 70
 TOP_N = 10
 
 @asynccontextmanager
