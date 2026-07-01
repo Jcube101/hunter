@@ -275,14 +275,17 @@ data is not critical).
 
 | Key | Type | Value | When set |
 |---|---|---|---|
-| `hunter_pb` | localStorage | integer | On game end if score > current PB |
+| `hunter_pb_easy` | localStorage | integer | PB for Easy mode |
+| `hunter_pb_normal` | localStorage | integer | PB for Normal mode |
+| `hunter_pb_hardcore` | localStorage | integer | PB for Hardcore mode |
 | `hunter_mute` | localStorage | `"true"` / `"false"` | On mute toggle |
 | `hunter_difficulty` | localStorage | `easy` / `normal` / `hardcore` | On difficulty select |
 | `hunter_tutorial_seen` | localStorage | `"true"` | After tutorial completed or skipped |
-| `hunter_setting_flee_radius` | localStorage | `"false"` | Flee radius circle toggle |
 | `hunter_setting_glow` | localStorage | `"false"` | Glow on fleeing fish toggle |
+| `hunter_rotation_toast_shown` | sessionStorage | `"true"` | After the portrait toast is shown (once per session) |
 
-No cookies. No session storage. No IndexedDB.
+The old global `hunter_pb` key is retired (ignored if present). No cookies.
+`sessionStorage` is used only for the once-per-session rotation toast. No IndexedDB.
 
 ---
 

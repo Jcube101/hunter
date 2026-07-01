@@ -94,31 +94,67 @@ Color states:
 
 ## Predator Sprite
 
-Dark angular silhouette — very dark navy-black #0d1f2d.
-Sharp angular fins, menacing against the #0a1628 background.
-Front tip is the catch point — must align with SHARK_MOUTH_OFFSET.
-No grey ellipse — pure angular canvas shapes.
+Dark angular silhouette — body #0d1f2d against #0a1628 background.
+Contrast achieved via teal outline stroke (#00BCD4 at 60% opacity)
+and subtle teal shadow glow (shadowBlur: 12, shadowColor: #00BCD4 at 40%).
+The teal treatment makes the predator read clearly at any screen brightness
+while remaining menacing. Teal eye at front for heading clarity.
+Sharp angular fins — body, dorsal, tail, pectoral.
+Front tip is the catch point — aligns with SHARK_MOUTH_OFFSET = 28.
 
 ---
 
 ## Settings Panel
 
-Accessible via gear icon (⚙) on start screen, top-left corner.
+Accessible via gear icon on start screen, top-left corner.
 Full-screen overlay, same dark navy background.
-Settings persisted in localStorage.
 
-### Visual Assists (v1 — default off)
-These are built in Session 8 but default to off. They may become
-unlockable features via coins system in v2.
-
+### Visual Assists
 | Setting | Key | Default | Description |
 |---|---|---|---|
-| Flee radius circle | hunter_setting_flee_radius | false | Faint teal ring around predator showing detection range |
 | Glow on fleeing fish | hunter_setting_glow | false | Canvas shadowBlur on teal fish while fleeing |
+
+Flee radius circle removed — not useful enough to justify UI space.
 
 ### v2 Settings (not built yet)
 - Fleeing fish color selection (teal default, pink, gold, red)
 - Sound volume slider
+
+---
+
+## Personal Best
+
+Three separate PB keys — one per difficulty:
+- hunter_pb_easy
+- hunter_pb_normal
+- hunter_pb_hardcore
+
+PB compared against the key matching the difficulty just played.
+The old global hunter_pb key is retired — ignored if present.
+"New personal best!" and leaderboard submit prompt only triggers
+when the current game's score beats the matching difficulty PB.
+
+---
+
+## Portrait Rotation Toast
+
+Shown when a touch device is detected in portrait orientation.
+Appears 1 second after the start screen loads.
+Auto-dismisses after 4 seconds.
+Shown once per session only — not on every orientation check.
+Does not block any interaction.
+Text: "Rotate your phone for the best experience 🔄"
+
+---
+
+## Start Screen Responsive Layout
+
+The start screen adapts to constrained viewport height (landscape on phones).
+When viewport height < 500px:
+- Title font size reduced
+- Vertical gaps and padding tightened
+- All elements remain visible without scrolling
+Detected via window.innerHeight on mount and on resize/orientation change.
 
 ---
 
