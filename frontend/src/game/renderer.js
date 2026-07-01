@@ -103,9 +103,14 @@ export function drawShark(ctx, x, y, angle) {
   ctx.translate(x, y)
   ctx.rotate(angle)
 
+  // Contrast layers (Session 9): the dark body barely reads against navy on dim
+  // screens, so a teal outline + soft teal shadow glow make it legible without
+  // making it look non-threatening. Coordinates/proportions are unchanged.
+  ctx.shadowColor = 'rgba(0, 188, 212, 0.4)'
+  ctx.shadowBlur = 12
   ctx.fillStyle = '#0d1f2d'
-  ctx.strokeStyle = '#1a3a4a'
-  ctx.lineWidth = 1
+  ctx.strokeStyle = 'rgba(0, 188, 212, 0.6)'
+  ctx.lineWidth = 1.5
 
   // Main body — angular, not rounded (nose = front tip = mouth point).
   ctx.beginPath()
@@ -147,7 +152,8 @@ export function drawShark(ctx, x, y, angle) {
   ctx.closePath()
   ctx.fill()
 
-  // Eye — small teal dot for contrast.
+  // Eye — small teal dot for heading clarity (no glow on the eye itself).
+  ctx.shadowBlur = 0
   ctx.beginPath()
   ctx.arc(16, -3, 2, 0, Math.PI * 2)
   ctx.fillStyle = '#00BCD4'
