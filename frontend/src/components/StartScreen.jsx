@@ -15,6 +15,7 @@ export default function StartScreen({
   onPlay,
   onLeaderboard,
   onHowToPlay,
+  onOpenSettings,
   muted,
   onToggleMute,
   difficulty,
@@ -29,6 +30,15 @@ export default function StartScreen({
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 px-6 text-center">
+      {/* Settings — top-left, gear icon */}
+      <button
+        onClick={onOpenSettings}
+        aria-label="Settings"
+        className="absolute left-4 top-4 rounded-lg border border-slate-700 px-3 py-2 text-xl leading-none text-slate-200 transition active:scale-95"
+      >
+        ⚙
+      </button>
+
       {/* Mute toggle — top-right, icon only, persisted in localStorage */}
       <button
         onClick={onToggleMute}

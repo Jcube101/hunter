@@ -14,6 +14,7 @@ import StartScreen from './components/StartScreen.jsx'
 import EndScreen from './components/EndScreen.jsx'
 import PauseScreen from './components/PauseScreen.jsx'
 import Tutorial from './components/Tutorial.jsx'
+import { Settings } from './components/Settings.jsx'
 import HUD from './components/HUD.jsx'
 import Minimap from './components/Minimap.jsx'
 
@@ -58,6 +59,7 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(
     () => localStorage.getItem(TUTORIAL_KEY) !== 'true',
   )
+  const [showSettings, setShowSettings] = useState(false)
   const stateRef = useRef('start')
   const setGameState = useCallback((s) => {
     stateRef.current = s
@@ -445,13 +447,16 @@ export default function App() {
           onPlay={startGame}
           onLeaderboard={() => {}} // start-screen leaderboard overlay — not in v1
           onHowToPlay={() => setShowTutorial(true)}
+          onOpenSettings={() => setShowSettings(true)}
           muted={sound.muted}
           onToggleMute={sound.toggleMute}
           difficulty={difficulty}
           onSelectDifficulty={selectDifficulty}
         />
       )}
-      {/* First-play tutorial — over the start screen only. */}
+      {/* Settings — over the start screen, below the tutorial (z-order). */}
+      {screen === 'start' && showSettings && <Settings onClose={() => setShowSettings(false)} />}
+      {/* First-play tutorial — over the start screen only (top of the stack). */}
       {screen === 'start' && showTutorial && (
         <Tutorial onDone={() => setShowTutorial(false)} />
       )}
