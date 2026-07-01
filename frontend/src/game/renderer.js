@@ -5,13 +5,9 @@
 // worldToScreen. The minimap is drawn on its own separate canvas.
 
 import { worldToScreen } from './camera.js'
-import {
-  SHARK_MOUTH_OFFSET,
-  JOYSTICK_BASE_X,
-  JOYSTICK_BASE_Y,
-  JOYSTICK_RADIUS,
-  JOYSTICK_KNOB_RADIUS,
-} from '../constants/boids.js'
+// No boids constants needed here: the shark nose is authored at local x = 28
+// (= SHARK_MOUTH_OFFSET) and colours are literals. The joystick is intentionally
+// invisible (Session 8) — no joystick drawing.
 
 // Heading helper: prefer an explicit angle (predator uses one with a jitter
 // threshold), else derive from velocity.
@@ -158,41 +154,6 @@ export function drawShark(ctx, x, y, angle) {
   ctx.fill()
 
   ctx.restore()
-}
-
-// Virtual joystick overlay (mobile only). Drawn in SCREEN space, so the caller
-// must invoke it with the base HiDPI transform set (no camera offset). The base
-// ring sits fixed bottom-left; the knob rides the stick's clamped displacement.
-// `showHint` draws a faint first-play label above the base (caller gates it on
-// hunter_tutorial_seen being unset).
-export function drawJoystick(ctx, joystick, viewport, showHint = false) {
-  const cx = JOYSTICK_BASE_X
-  const cy = viewport.height - JOYSTICK_BASE_Y
-
-  // Base ring — always visible during gameplay, semi-transparent.
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.arc(cx, cy, JOYSTICK_RADIUS, 0, Math.PI * 2)
-  ctx.stroke()
-
-  // Knob — offset by the (clamped) displacement when active, centered at rest.
-  const kx = cx + (joystick?.active ? joystick.dx : 0)
-  const ky = cy + (joystick?.active ? joystick.dy : 0)
-  ctx.fillStyle = 'rgba(255,255,255,0.6)'
-  ctx.beginPath()
-  ctx.arc(kx, ky, JOYSTICK_KNOB_RADIUS, 0, Math.PI * 2)
-  ctx.fill()
-
-  // First-play hint, faint, centered above the base ring.
-  if (showHint) {
-    ctx.fillStyle = 'rgba(255,255,255,0.4)'
-    ctx.font = '10px system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'alphabetic'
-    ctx.fillText('JOYSTICK', cx, cy - JOYSTICK_RADIUS - 8)
-    ctx.textAlign = 'left' // restore default for any later text draws
-  }
 }
 
 // Minimap on its own small canvas. Reads its size from ctx.canvas. Shows the

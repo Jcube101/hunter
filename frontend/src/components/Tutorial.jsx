@@ -18,7 +18,7 @@ const SLIDES = [
   },
   {
     title: 'Use the Joystick',
-    body: 'Press and drag the joystick in the bottom-left corner to move your shark.',
+    body: 'Press and drag in the bottom-left corner to move your shark. The joystick is invisible — just press anywhere in that area and drag.',
     visual: '🕹️',
   },
   {

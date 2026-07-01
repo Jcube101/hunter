@@ -25,12 +25,11 @@ import { useGameLoop } from './hooks/useGameLoop.js'
 import { useSound } from './hooks/useSound.js'
 
 import { updateCamera, worldToScreen } from './game/camera.js'
-import { drawBackground, drawSchool, drawShark, drawFleeRadius, drawMinimap, drawJoystick } from './game/renderer.js'
+import { drawBackground, drawSchool, drawShark, drawFleeRadius, drawMinimap } from './game/renderer.js'
 import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
 import { theme } from './constants/theme.js'
 import {
   FISH_COUNT,
-  MOBILE_BREAKPOINT,
   WORLD_WIDTH_MULTIPLIER,
   WORLD_HEIGHT_MULTIPLIER,
   GAME_DURATION,
@@ -104,9 +103,6 @@ export default function App() {
   // Catches are disabled during a brief grace period at game start (Fix 3).
   const graceRef = useRef(true)
   const graceTimerRef = useRef(null)
-  // First-play joystick hint: shown until the tutorial has been seen. Snapshotted
-  // at game start so the draw loop doesn't hit localStorage every frame.
-  const joystickHintRef = useRef(false)
 
   // HUD display state (synced only on events)
   const [displayScore, setDisplayScore] = useState(0)
@@ -270,18 +266,12 @@ export default function App() {
     drawParticles(ctx, particlesRef.current, cam)
     ctx.restore()
 
-    // Virtual joystick overlay — mobile only, screen-space (after shake restore
-    // so it never jitters). Base transform still carries the HiDPI scale.
-    if (vp.width < MOBILE_BREAKPOINT) {
-      drawJoystick(ctx, joystickRef.current, vp, joystickHintRef.current)
-    }
-
     // Minimap on its own canvas (no shake).
     const mm = minimapRef.current
     if (mm) {
       drawMinimap(mm.getContext('2d'), fishRef.current, predatorRef.current, worldRef.current, theme)
     }
-  }, [fishRef, predatorRef, worldRef, joystickRef])
+  }, [fishRef, predatorRef, worldRef])
 
   const { start, stop } = useGameLoop(onFrameUpdate, onFrameDraw)
 
@@ -292,9 +282,6 @@ export default function App() {
     // Lock the difficulty's fish-flee settings for this game (selector is
     // start-screen only). Shark speed is constant (SHARK_SPEED) in all modes.
     fleeSettingsRef.current = DIFFICULTY_SETTINGS[difficulty]
-
-    // Show the joystick hint only until the tutorial has been seen.
-    joystickHintRef.current = localStorage.getItem(TUTORIAL_KEY) !== 'true'
 
     // Snapshot the visual-assist settings for this game (frozen for its duration).
     settingsRef.current = {
