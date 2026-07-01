@@ -24,7 +24,7 @@ import { useGameLoop } from './hooks/useGameLoop.js'
 import { useSound } from './hooks/useSound.js'
 
 import { updateCamera, worldToScreen } from './game/camera.js'
-import { drawBackground, drawSchool, drawShark, drawMinimap, drawJoystick } from './game/renderer.js'
+import { drawBackground, drawSchool, drawShark, drawFleeRadius, drawMinimap, drawJoystick } from './game/renderer.js'
 import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
 import { theme } from './constants/theme.js'
 import {
@@ -253,6 +253,8 @@ export default function App() {
       )
       shakeRef.current -= 1
     }
+    // Flee-radius circle (settings-gated) — before the fish so it sits behind them.
+    drawFleeRadius(ctx, predatorRef.current, cam, fleeSettingsRef.current.FLEE_RADIUS, settingsRef.current)
     drawSchool(
       ctx,
       fishRef.current,
