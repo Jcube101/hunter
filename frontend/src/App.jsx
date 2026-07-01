@@ -45,7 +45,6 @@ import {
   GRACE_PERIOD,
 } from './constants/boids.js'
 
-const PB_KEY = 'hunter_pb'
 const DIFFICULTY_KEY = 'hunter_difficulty'
 const TUTORIAL_KEY = 'hunter_tutorial_seen'
 const SETTING_GLOW_KEY = 'hunter_setting_glow'
@@ -349,15 +348,18 @@ export default function App() {
     stop()
     exit()
     soundRef.current.stopAmbient()
-    const stored = parseInt(localStorage.getItem(PB_KEY) ?? '-1', 10)
-    const prevPB = Number.isNaN(stored) ? -1 : stored
+    // Per-difficulty PB — modes are incomparable, so each has its own key. The
+    // old global hunter_pb is retired (never read or written). Default 0, so a
+    // score only counts as a new PB when it beats the matching difficulty's best.
+    const pbKey = `hunter_pb_${difficulty}`
+    const currentPB = parseInt(localStorage.getItem(pbKey) || '0', 10)
     const score = scoreRef.current
-    const isNewPB = score > prevPB
-    if (isNewPB) localStorage.setItem(PB_KEY, String(score))
+    const isNewPB = score > currentPB
+    if (isNewPB) localStorage.setItem(pbKey, String(score))
     // Game-over tone always; on a new PB, follow it with a congrats sting.
     soundRef.current.playEnd()
     if (isNewPB) setTimeout(() => soundRef.current.playCongrats(), 800)
-    setEndData({ score, personalBest: isNewPB ? score : prevPB, isNewPB })
+    setEndData({ score, personalBest: isNewPB ? score : currentPB, isNewPB })
     setGameState('end')
   }
 

@@ -3,8 +3,6 @@
 import { useEffect, useState } from 'react'
 import { theme } from '../constants/theme.js'
 
-const PB_KEY = 'hunter_pb'
-
 const DIFFICULTIES = [
   ['easy', 'Easy'],
   ['normal', 'Normal'],
@@ -23,10 +21,12 @@ export default function StartScreen({
 }) {
   const [personalBest, setPersonalBest] = useState(null)
 
+  // Show the PB for the currently selected difficulty; updates when the player
+  // switches difficulty. Each mode has its own key (hunter_pb_<difficulty>).
   useEffect(() => {
-    const stored = localStorage.getItem(PB_KEY)
-    if (stored !== null) setPersonalBest(parseInt(stored, 10))
-  }, [])
+    const stored = localStorage.getItem(`hunter_pb_${difficulty}`)
+    setPersonalBest(stored !== null ? parseInt(stored, 10) : null)
+  }, [difficulty])
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 px-6 text-center">
