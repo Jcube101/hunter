@@ -66,24 +66,10 @@ export function drawFish(ctx, x, y, angle, isFleeing, settings = {}) {
   ctx.restore()
 }
 
-// Faint teal ring around the predator showing its detection range. Settings-
-// gated (default off) — no-op unless settings.fleeRadius is on.
-export function drawFleeRadius(ctx, predator, camera, fleeRadius, settings) {
-  if (!settings.fleeRadius) return
-  const s = worldToScreen(predator.x, predator.y, camera)
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(s.x, s.y, fleeRadius, 0, Math.PI * 2)
-  ctx.strokeStyle = 'rgba(0, 188, 212, 0.15)' // teal at 15%
-  ctx.lineWidth = 1
-  ctx.stroke()
-  ctx.restore()
-}
-
 // Draw the whole school through the camera. Colours each fish by whether it is
-// within `fleeRadius` (the current difficulty's FLEE_RADIUS) of the predator.
-export function drawSchool(ctx, fishList, camera, predator, fleeRadius, settings) {
-  const fr2 = fleeRadius * fleeRadius
+// within `detectRadius` (the current difficulty's FLEE_RADIUS) of the predator.
+export function drawSchool(ctx, fishList, camera, predator, detectRadius, settings) {
+  const fr2 = detectRadius * detectRadius
   for (const fish of fishList) {
     const s = worldToScreen(fish.x, fish.y, camera)
     const dx = fish.x - predator.x

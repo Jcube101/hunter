@@ -25,7 +25,7 @@ import { useGameLoop } from './hooks/useGameLoop.js'
 import { useSound } from './hooks/useSound.js'
 
 import { updateCamera, worldToScreen } from './game/camera.js'
-import { drawBackground, drawSchool, drawShark, drawFleeRadius, drawMinimap } from './game/renderer.js'
+import { drawBackground, drawSchool, drawShark, drawMinimap } from './game/renderer.js'
 import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
 import { theme } from './constants/theme.js'
 import {
@@ -48,7 +48,6 @@ import {
 const PB_KEY = 'hunter_pb'
 const DIFFICULTY_KEY = 'hunter_difficulty'
 const TUTORIAL_KEY = 'hunter_tutorial_seen'
-const SETTING_FLEE_KEY = 'hunter_setting_flee_radius'
 const SETTING_GLOW_KEY = 'hunter_setting_glow'
 
 export default function App() {
@@ -78,9 +77,9 @@ export default function App() {
     localStorage.setItem(DIFFICULTY_KEY, d)
   }, [])
   const fleeSettingsRef = useRef(DIFFICULTY_SETTINGS[DEFAULT_DIFFICULTY])
-  // Visual-assist settings (flee-radius circle, glow), read from localStorage at
-  // game start and frozen for the game — changing them takes effect next game.
-  const settingsRef = useRef({ fleeRadius: false, glow: false })
+  // Visual-assist settings (glow on fleeing fish), read from localStorage at game
+  // start and frozen for the game — changing it takes effect next game.
+  const settingsRef = useRef({ glow: false })
 
   // Canvas + minimap elements
   const canvasRef = useRef(null)
@@ -251,8 +250,6 @@ export default function App() {
       )
       shakeRef.current -= 1
     }
-    // Flee-radius circle (settings-gated) — before the fish so it sits behind them.
-    drawFleeRadius(ctx, predatorRef.current, cam, fleeSettingsRef.current.FLEE_RADIUS, settingsRef.current)
     drawSchool(
       ctx,
       fishRef.current,
@@ -284,8 +281,9 @@ export default function App() {
     fleeSettingsRef.current = DIFFICULTY_SETTINGS[difficulty]
 
     // Snapshot the visual-assist settings for this game (frozen for its duration).
+    // getItem returns null for an unset key, and null === 'true' is false, so glow
+    // is off unless the player explicitly enabled it.
     settingsRef.current = {
-      fleeRadius: localStorage.getItem(SETTING_FLEE_KEY) === 'true',
       glow: localStorage.getItem(SETTING_GLOW_KEY) === 'true',
     }
 

@@ -1,13 +1,12 @@
 // Settings.jsx — full-screen settings overlay. UI only, no game logic.
 //
-// Visual-assist toggles (flee-radius circle, glow on fleeing fish), both default
-// off and persisted in localStorage. App reads these keys at game start; changing
-// a toggle here takes effect on the next game.
+// One visual-assist toggle (glow on fleeing fish), default off and persisted in
+// localStorage. App reads the key at game start; changing it takes effect on the
+// next game.
 
 import { useState } from 'react'
 import { theme } from '../constants/theme.js'
 
-const FLEE_KEY = 'hunter_setting_flee_radius'
 const GLOW_KEY = 'hunter_setting_glow'
 
 // Clean on/off switch — teal when on, grey when off; label left, switch right.
@@ -36,7 +35,6 @@ function Toggle({ label, description, on, onChange }) {
 }
 
 export function Settings({ onClose }) {
-  const [fleeRadius, setFleeRadius] = useState(() => localStorage.getItem(FLEE_KEY) === 'true')
   const [glow, setGlow] = useState(() => localStorage.getItem(GLOW_KEY) === 'true')
 
   const toggle = (key, value, setter) => {
@@ -64,12 +62,6 @@ export function Settings({ onClose }) {
 
       <div className="flex flex-col items-center gap-3">
         <span className="text-xs uppercase tracking-widest text-slate-500">Visual Assists</span>
-        <Toggle
-          label="Flee radius circle"
-          description="Shows detection range around predator"
-          on={fleeRadius}
-          onChange={(v) => toggle(FLEE_KEY, v, setFleeRadius)}
-        />
         <Toggle
           label="Glow on fleeing fish"
           description="Highlights fish within range"
