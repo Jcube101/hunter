@@ -86,15 +86,17 @@ export function drawSchool(ctx, fishList, camera, predator, detectRadius, settin
   }
 }
 
-// Angular predator, drawn at (x, y) facing `angle`. Coordinate-agnostic like
-// drawFish (game passes screen coords, tutorial passes canvas coords). The sharp
-// nose sits at local x = 28 = SHARK_MOUTH_OFFSET, so the visual front tip lands
-// exactly on the catch point (camera is 1:1).
+// Predator, drawn at (x, y) facing `angle`. Coordinate-agnostic like drawFish
+// (game passes screen coords, tutorial passes canvas coords). The sharp nose sits
+// at local x = 28 = SHARK_MOUTH_OFFSET, so the visual front tip lands exactly on
+// the catch point (camera is 1:1).
 //
-// Geometry (Session 10): a single angular quadrilateral body — widest toward the
-// rear-top, tapering to the nose — plus a forked V-tail drawn as its own sub-path
-// with a small gap behind the body. Straight lines only; the red eye is the one
-// circle. Teal outline + soft teal glow keep the dark body legible on navy.
+// Geometry (Session 10, traced from the reference silhouette): one continuous
+// outline — snout → raked-back dorsal fin → back → forked caudal tail (larger
+// upper lobe, notch into the body, smaller lower lobe, no gap) → belly fin →
+// lower jaw back to the nose. A seam line marks the dorsal fin base. Straight
+// lines only; the red eye is the one circle. ~56px long (nose +28 to tail ~-28).
+// Teal outline + soft teal glow keep the dark body legible on navy.
 export function drawShark(ctx, x, y, angle) {
   ctx.save()
   ctx.translate(x, y)
@@ -106,32 +108,38 @@ export function drawShark(ctx, x, y, angle) {
   ctx.strokeStyle = 'rgba(0, 188, 212, 0.6)'
   ctx.lineWidth = 1.5
 
-  // Body — angular quadrilateral. Nose (28,0) is the catch point; widest toward
-  // the rear-top; (-18,0) is the rear notch the tail sits behind.
+  // Body outline — one continuous silhouette (clockwise from the nose).
   ctx.beginPath()
   ctx.moveTo(28, 0) // nose (sharp front point = catch point)
-  ctx.lineTo(-10, -11) // rear-top (widest)
-  ctx.lineTo(-18, 0) // tail base (rear notch)
-  ctx.lineTo(-7, 8) // rear-bottom
+  ctx.lineTo(11.5, -2.4) // upper back
+  ctx.lineTo(5, -5.2) // dorsal fin front base
+  ctx.lineTo(0.7, -11.9) // dorsal fin peak (raked back)
+  ctx.lineTo(-2, -4.5) // dorsal fin rear base
+  ctx.lineTo(-10, -2.4) // mid back
+  ctx.lineTo(-16.5, -1) // upper caudal peduncle
+  ctx.lineTo(-27.8, -6.3) // upper tail lobe tip
+  ctx.lineTo(-18.9, 0.2) // tail fork notch (into the body)
+  ctx.lineTo(-25, 4.9) // lower tail lobe tip
+  ctx.lineTo(-16, 1.8) // lower caudal peduncle
+  ctx.lineTo(-6, 4.5) // belly
+  ctx.lineTo(-4, 4.8) // belly fin front
+  ctx.lineTo(-2, 8.1) // belly fin tip
+  ctx.lineTo(1.5, 4.9) // belly fin rear
+  ctx.lineTo(15, 3.4) // lower jaw
   ctx.closePath()
   ctx.fill()
   ctx.stroke()
 
-  // Forked V-tail — separate sub-path, ~4px gap from the body's rear notch.
+  // Dorsal fin base seam — the border line where the fin meets the body.
   ctx.beginPath()
-  ctx.moveTo(-22, -3) // upper root
-  ctx.lineTo(-34, -13) // upper tip
-  ctx.lineTo(-27, 0) // inner fork notch
-  ctx.lineTo(-34, 13) // lower tip
-  ctx.lineTo(-22, 3) // lower root
-  ctx.closePath()
-  ctx.fill()
+  ctx.moveTo(5, -5.2)
+  ctx.lineTo(-2, -4.5)
   ctx.stroke()
 
-  // Eye — small red circle near the front, slightly above center (no glow).
+  // Eye — small red circle high near the front (no glow).
   ctx.shadowBlur = 0
   ctx.beginPath()
-  ctx.arc(18, -3, 2, 0, Math.PI * 2)
+  ctx.arc(14, -1.3, 1.8, 0, Math.PI * 2)
   ctx.fillStyle = '#FF4444'
   ctx.fill()
 
