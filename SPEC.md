@@ -183,13 +183,16 @@ WantedBy=multi-user.target
 
 ## API Contracts
 
-### GET /api/leaderboard?difficulty=easy|normal|hardcore
+### GET /api/leaderboard?difficulty=easy|normal|hardcore&platform=desktop|mobile
 
-Returns the top 10 scores **for that difficulty**, ordered by score descending.
+Returns the top 10 scores **for that difficulty + platform**, ordered by score
+descending. Each difficulty board is split by platform (desktop play is harder,
+so scores aren't comparable) — 6 boards total.
 
-- `difficulty` query param is **required** — `easy`, `normal`, or `hardcore`.
-- Missing or invalid `difficulty` → **400**.
-- Empty array if no entries for that difficulty.
+- `difficulty` query param **required** — `easy`, `normal`, or `hardcore`.
+- `platform` query param **required** — `desktop` or `mobile`.
+- Missing or invalid either param → **400**.
+- Empty array if no entries for that combination.
 
 **Response 200:**
 ```json
@@ -200,6 +203,7 @@ Returns the top 10 scores **for that difficulty**, ordered by score descending.
     "score": 23,
     "theme": "ocean",
     "difficulty": "easy",
+    "platform": "desktop",
     "created_at": "2026-06-28T10:30:00"
   }
 ]
@@ -220,7 +224,8 @@ chooses to add their score.
   "name": "Job",
   "score": 23,
   "theme": "ocean",
-  "difficulty": "easy"
+  "difficulty": "easy",
+  "platform": "desktop"
 }
 ```
 
@@ -229,6 +234,7 @@ chooses to add their score.
 - `score`: integer, 0–70 (`Field(..., ge=0, le=70)` — Easy now spawns 70 fish)
 - `theme`: enum — `"ocean"` only in v1
 - `difficulty`: enum — `easy` / `normal` / `hardcore` (defaults to `normal`)
+- `platform`: enum — `desktop` / `mobile`, **required** (invalid → 422)
 
 **Response 201:**
 ```json
@@ -261,13 +267,17 @@ CREATE TABLE IF NOT EXISTS leaderboard (
     name        TEXT    NOT NULL,
     score       INTEGER NOT NULL,
     theme       TEXT    NOT NULL DEFAULT 'ocean',
+    difficulty  TEXT    NOT NULL DEFAULT 'normal',
+    platform    TEXT    NOT NULL,             -- 'desktop' | 'mobile' (Session 11)
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
 Single table. No migrations framework — schema created on startup if not
-exists. If schema needs to change in future: drop and recreate (leaderboard
-data is not critical).
+exists. `init_db()` performs a one-time reset: if a pre-`platform` table is
+found it is dropped and recreated (wiping old scores), then left untouched on
+later startups. Leaderboard data is not critical, so drop-and-recreate on schema
+change is acceptable.
 
 ---
 

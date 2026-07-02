@@ -380,16 +380,24 @@ Never shown again. Accessible again via "How to play" link on start screen.
 
 ## Leaderboard
 
-Three separate leaderboards — one per difficulty mode. Easy, Normal, and
-Hardcore scores are never compared against each other. Comparing Easy 34
-to Hardcore 8 is meaningless — each mode has its own ranked list.
+Six separate leaderboards — three difficulties (Easy / Normal / Hardcore) each
+split by platform (desktop / mobile). Scores are never compared across
+difficulties (Easy 34 vs Hardcore 8 is meaningless) nor across platforms
+(desktop play is meaningfully harder than mobile). Each difficulty×platform
+combination has its own ranked list.
 
-End screen shows the leaderboard for the difficulty mode just played.
-Full leaderboard view has three tabs: Easy / Normal / Hardcore.
-Default tab on full leaderboard: the mode just played.
+Platform is auto-detected from the player's device (touch device → mobile,
+else desktop — the same `navigator.maxTouchPoints` check the rotation toast
+uses, factored into `utils/platform.js`).
 
-API: GET /api/leaderboard?difficulty=easy|normal|hardcore
-     POST /api/leaderboard — unchanged, difficulty field already stored
+End screen shows the board for the difficulty just played, on the player's own
+platform. Full leaderboard view has three difficulty tabs plus an independent
+desktop/mobile platform toggle (view-only, session state — it never changes the
+platform a score is submitted under, which is always the player's real device).
+Defaults: the mode just played + the player's detected platform.
+
+API: GET /api/leaderboard?difficulty=easy|normal|hardcore&platform=desktop|mobile
+     POST /api/leaderboard — body includes required `platform`
 
 ### Storage
 - **Personal best:** localStorage key `hunter_pb` — score as integer.
@@ -403,29 +411,34 @@ CREATE TABLE IF NOT EXISTS leaderboard (
     name TEXT NOT NULL,
     score INTEGER NOT NULL,
     theme TEXT NOT NULL DEFAULT 'ocean',
+    difficulty TEXT NOT NULL DEFAULT 'normal',
+    platform TEXT NOT NULL,             -- 'desktop' | 'mobile' (Session 11)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
+The `platform` column was added in Session 11; adding it wiped all prior scores
+(no migration/backfill — platform isn't knowable for old rows).
 
 ### Opt-in Submit Flow
 1. Game ends
 2. New PB detected (local check only)
 3. "Add to leaderboard?" shown with name input
 4. Player enters name (max 20 chars) → Submit
-5. POST /api/leaderboard with {name, score, theme}
+5. POST /api/leaderboard with {name, score, theme, difficulty, platform}
 6. Confirmation shown — "Added!"
 7. If not new PB or player skips: nothing is sent. Ever.
 
 ### API Endpoints
 
 ```text
-GET  /api/leaderboard?difficulty=easy|normal|hardcore
-                         → top 10 for that difficulty, score desc
-                         → difficulty param required; missing/invalid → 400
-POST /api/leaderboard    → {name, score, theme, difficulty} → 201 on success
+GET  /api/leaderboard?difficulty=easy|normal|hardcore&platform=desktop|mobile
+                         → top 10 for that difficulty+platform, score desc
+                         → both params required; missing/invalid → 400
+POST /api/leaderboard    → {name, score, theme, difficulty, platform} → 201
+                         → platform must be desktop|mobile, else 422
 ```
 
-Top 10 per difficulty. No pagination. No delete. No auth.
+Top 10 per difficulty+platform (6 boards). No pagination. No delete. No auth.
 
 POST /api/leaderboard score max: 70 (was 50) — Easy now spawns 70 fish, so
 the max possible score is 70.
