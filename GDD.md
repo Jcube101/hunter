@@ -82,25 +82,29 @@ lock made mobile equivalent to desktop, breaking the split.
 
 ## Fish Sprites
 
-Shape: diamond/lens — a pointed oval with a small v-notch tail.
-Larger and more elegant than the previous chevron.
+Shape: compact kite/diamond (~16px long) — a sharp point at the nose (front)
+and a sharp point at the rear, widest in the middle. A small separate rhombus
+tail block sits just behind the rear point, drawn in a lighter colour. Straight
+lines only, no eye.
 
 Color states:
-- Calm: white/silver #E8EDF0 — school not within flee radius
-- Fleeing: teal #00BCD4 — fish within FLEE_RADIUS of predator
-- Glow on fleeing: canvas shadowBlur in teal, settings-gated (default off)
+- Calm: body white/silver #E8EDF0, tail block #C0C8D0 — school not within flee radius
+- Fleeing: body teal #00BCD4, tail block #00A0B4 — fish within FLEE_RADIUS of predator
+- Glow on fleeing: canvas shadowBlur in teal on the body, settings-gated (default off)
 
 ---
 
 ## Predator Sprite
 
-Dark angular silhouette — body #0d1f2d against #0a1628 background.
-Contrast achieved via teal outline stroke (#00BCD4 at 60% opacity)
-and subtle teal shadow glow (shadowBlur: 12, shadowColor: #00BCD4 at 40%).
-The teal treatment makes the predator read clearly at any screen brightness
-while remaining menacing. Teal eye at front for heading clarity.
-Sharp angular fins — body, dorsal, tail, pectoral.
-Front tip is the catch point — aligns with SHARK_MOUTH_OFFSET = 28.
+Angular silhouette (~56px long) — a single quadrilateral body (dark #0d1f2d),
+widest toward the rear-top and tapering to a sharp nose, plus a forked V-tail
+drawn as a separate sub-path with a small gap behind the body. Straight lines
+only; a small red #FF4444 circle eye near the front for heading clarity is the
+one non-straight shape.
+Contrast via teal outline stroke (#00BCD4 at 60% opacity) and a soft teal shadow
+glow (shadowBlur: 12, shadowColor: #00BCD4 at 40%) so the dark body reads at any
+screen brightness while staying menacing.
+Front nose tip is the catch point — aligns with SHARK_MOUTH_OFFSET = 28.
 
 ---
 
