@@ -24,45 +24,52 @@ export function drawBackground(ctx, viewport, theme) {
   ctx.fillRect(0, 0, viewport.width, viewport.height)
 }
 
-const FISH_CALM_COLOR = '#E8EDF0' // white/silver — not within flee radius
-const FISH_FLEE_COLOR = '#00BCD4' // teal — within FLEE_RADIUS of the predator
+const FISH_CALM_COLOR = '#E8EDF0' // body, white/silver — not within flee radius
+const FISH_FLEE_COLOR = '#00BCD4' // body, teal — within FLEE_RADIUS of the predator
+const FISH_CALM_TAIL = '#C0C8D0' // tail block, calm (lighter than body)
+const FISH_FLEE_TAIL = '#00A0B4' // tail block, fleeing (darker teal)
 const FISH_GLOW_BLUR = 8 // shadowBlur px when the glow assist is on
 
 // One fish, drawn at (x, y) facing `angle`. Coordinate-agnostic: the game passes
-// screen coords (camera-transformed), the tutorial passes canvas coords. Diamond/
-// lens body with a v-notch tail; teal when fleeing, white/silver when calm. Glow
-// only when settings.glow is on AND the fish is fleeing.
+// screen coords (camera-transformed), the tutorial passes canvas coords.
+//
+// Geometry (Session 10): a compact kite/diamond body — sharp point at the nose
+// (front) and rear, widest in the middle — plus a small separate rhombus tail
+// block behind the rear point, in a lighter colour. Straight lines only, no eye.
+// Body/tail swap to teal shades when fleeing; the fleeing body glows only when
+// settings.glow is on.
 export function drawFish(ctx, x, y, angle, isFleeing, settings = {}) {
   ctx.save()
   ctx.translate(x, y)
   ctx.rotate(angle)
 
-  const W = 10 // half-length
-  const H = 4 // half-height
-
-  ctx.beginPath()
-  ctx.moveTo(W, 0) // nose
-  ctx.quadraticCurveTo(W * 0.3, H, -W * 0.5, H * 0.8) // top curve
-  ctx.lineTo(-W, 0) // tail center
-  ctx.lineTo(-W * 0.5, -H * 0.8)
-  ctx.quadraticCurveTo(W * 0.3, -H, W, 0) // bottom curve
-  ctx.closePath()
-
-  // V-notch tail
-  ctx.moveTo(-W * 0.5, H * 0.8)
-  ctx.lineTo(-W * 1.3, H * 1.2)
-  ctx.lineTo(-W, 0)
-  ctx.lineTo(-W * 1.3, -H * 1.2)
-  ctx.lineTo(-W * 0.5, -H * 0.8)
-
-  ctx.fillStyle = isFleeing ? FISH_FLEE_COLOR : FISH_CALM_COLOR
   if (isFleeing && settings.glow) {
     ctx.shadowColor = FISH_FLEE_COLOR
     ctx.shadowBlur = FISH_GLOW_BLUR
   } else {
     ctx.shadowBlur = 0
   }
+
+  // Tail block — small rhombus behind the rear point, slightly offset, lighter.
+  ctx.fillStyle = isFleeing ? FISH_FLEE_TAIL : FISH_CALM_TAIL
+  ctx.beginPath()
+  ctx.moveTo(-6, 0)
+  ctx.lineTo(-8, -2.5)
+  ctx.lineTo(-10, 0)
+  ctx.lineTo(-8, 2.5)
+  ctx.closePath()
   ctx.fill()
+
+  // Body — kite/diamond: sharp nose (front) + sharp rear, widest in the middle.
+  ctx.fillStyle = isFleeing ? FISH_FLEE_COLOR : FISH_CALM_COLOR
+  ctx.beginPath()
+  ctx.moveTo(7, 0) // nose
+  ctx.lineTo(0, -4) // top (widest)
+  ctx.lineTo(-5, 0) // rear
+  ctx.lineTo(0, 4) // bottom
+  ctx.closePath()
+  ctx.fill()
+
   ctx.restore()
 }
 
