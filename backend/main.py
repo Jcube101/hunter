@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 DIFFICULTIES = {"easy", "normal", "hardcore"}
+PLATFORMS = {"desktop", "mobile"}
 
 # --- Paths (resolved relative to this file, not the cwd) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -54,8 +55,18 @@ def get_connection():
 
 
 def init_db():
-    """Create the leaderboard table if it does not already exist."""
+    """Create the leaderboard table if absent.
+
+    Session 11 added a required `platform` column and split each difficulty board
+    into desktop/mobile. Platform is not comparable across old rows, so this is a
+    clean reset: a pre-platform table is dropped once (wiping old scores) and
+    recreated. Idempotent afterward — a table that already has `platform` is left
+    untouched.
+    """
     with get_connection() as conn:
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(leaderboard)").fetchall()]
+        if cols and "platform" not in cols:
+            conn.execute("DROP TABLE leaderboard")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS leaderboard (
@@ -64,34 +75,36 @@ def init_db():
                 score       INTEGER NOT NULL,
                 theme       TEXT    NOT NULL DEFAULT 'ocean',
                 difficulty  TEXT    NOT NULL DEFAULT 'normal',
+                platform    TEXT    NOT NULL,
                 created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
 
 
-def fetch_top(difficulty, limit=TOP_N):
-    """Top scores for one difficulty, ordered by score desc, earliest first on a tie."""
+def fetch_top(difficulty, platform, limit=TOP_N):
+    """Top scores for one difficulty+platform, score desc, earliest first on a tie."""
     with get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT id, name, score, theme, difficulty, created_at
+            SELECT id, name, score, theme, difficulty, platform, created_at
             FROM leaderboard
-            WHERE difficulty = ?
+            WHERE difficulty = ? AND platform = ?
             ORDER BY score DESC, created_at ASC
             LIMIT ?
             """,
-            (difficulty, limit),
+            (difficulty, platform, limit),
         ).fetchall()
     return [dict(row) for row in rows]
 
 
-def insert_entry(name, score, theme, difficulty):
+def insert_entry(name, score, theme, difficulty, platform):
     """Insert a single leaderboard row."""
     with get_connection() as conn:
         conn.execute(
-            "INSERT INTO leaderboard (name, score, theme, difficulty) VALUES (?, ?, ?, ?)",
-            (name, score, theme, difficulty),
+            "INSERT INTO leaderboard (name, score, theme, difficulty, platform) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (name, score, theme, difficulty, platform),
         )
 
 
@@ -102,6 +115,7 @@ class LeaderboardEntry(BaseModel):
     score: int = Field(..., ge=0, le=MAX_SCORE)
     theme: str = Field(default="ocean")
     difficulty: str = Field(default="normal")
+    platform: str  # required — 'desktop' or 'mobile' (validated below)
 
     @field_validator("name")
     @classmethod
@@ -123,8 +137,17 @@ class LeaderboardEntry(BaseModel):
     @classmethod
     def validate_difficulty(cls, v):
         v = v.lower()
-        if v not in {"easy", "normal", "hardcore"}:
+        if v not in DIFFICULTIES:
             raise ValueError("difficulty must be easy, normal, or hardcore")
+        return v
+
+    @field_validator("platform")
+    @classmethod
+    def validate_platform(cls, v):
+        # Reject anything but the two allowed values (no silent coercion) -> 422.
+        v = v.lower()
+        if v not in PLATFORMS:
+            raise ValueError("platform must be desktop or mobile")
         return v
 
 
@@ -136,25 +159,30 @@ def health():
 
 
 @app.get("/api/leaderboard")
-def get_leaderboard(difficulty: str | None = None):
-    """Top 10 for one difficulty, highest first. Always an array (possibly empty).
+def get_leaderboard(difficulty: str | None = None, platform: str | None = None):
+    """Top 10 for one difficulty+platform, highest first. Always an array.
 
-    `difficulty` is required (easy|normal|hardcore) — each mode has its own
-    ranked list; cross-difficulty comparison is meaningless. Missing or invalid
-    difficulty -> 400.
+    Both params are required. Each of the three difficulty boards is split by
+    platform (desktop/mobile) because desktop play is harder — scores across
+    platforms aren't comparable. Missing or invalid difficulty/platform -> 400.
     """
     if difficulty not in DIFFICULTIES:
         raise HTTPException(
             status_code=400,
             detail="difficulty query param required: easy, normal, or hardcore",
         )
-    return fetch_top(difficulty)
+    if platform not in PLATFORMS:
+        raise HTTPException(
+            status_code=400,
+            detail="platform query param required: desktop or mobile",
+        )
+    return fetch_top(difficulty, platform)
 
 
 @app.post("/api/leaderboard", status_code=201)
 def post_leaderboard(entry: LeaderboardEntry):
     """Opt-in submit. Only called when a player chooses to add their score."""
-    insert_entry(entry.name, entry.score, entry.theme, entry.difficulty)
+    insert_entry(entry.name, entry.score, entry.theme, entry.difficulty, entry.platform)
     return {"status": "added"}
 
 
