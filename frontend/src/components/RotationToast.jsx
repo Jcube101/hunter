@@ -6,6 +6,7 @@
 // (pointer-events-none).
 
 import { useEffect, useState } from 'react'
+import { isTouchDevice } from '../utils/platform.js'
 
 const SESSION_KEY = 'hunter_rotation_toast_shown'
 const FADE_MS = 300
@@ -15,9 +16,8 @@ export function RotationToast() {
   const [show, setShow] = useState(false) // drives the opacity transition
 
   useEffect(() => {
-    const isTouchDevice = navigator.maxTouchPoints > 0
     const isPortrait = window.innerHeight > window.innerWidth
-    if (!isTouchDevice || !isPortrait) return undefined
+    if (!isTouchDevice() || !isPortrait) return undefined
     if (sessionStorage.getItem(SESSION_KEY)) return undefined
 
     let hideTimer

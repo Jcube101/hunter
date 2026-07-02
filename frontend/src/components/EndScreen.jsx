@@ -1,22 +1,27 @@
 // EndScreen.jsx — final score, personal best, and per-difficulty leaderboards.
 //
-// There are three independent leaderboards (one per difficulty) — Easy/Normal/
-// Hardcore scores are never compared. The top-5 preview shows the difficulty the
-// player just played; the full overlay has three tabs and defaults to that mode.
-// The API is same-origin (/api/leaderboard?difficulty=…) — direct in production,
-// via the Vite proxy in dev.
+// Six independent leaderboards — three difficulties (Easy/Normal/Hardcore) each
+// split by platform (desktop/mobile), since desktop play is harder and scores
+// aren't comparable across platforms. The top-5 preview shows the difficulty the
+// player just played on their OWN platform (auto-detected). The full overlay has
+// difficulty tabs plus a platform toggle so any of the six boards can be viewed;
+// that toggle is view-only and never changes which platform a score is submitted
+// under (that's always the player's real device).
+// API is same-origin (/api/leaderboard?difficulty=…&platform=…).
 
 import { useCallback, useEffect, useState } from 'react'
 import { theme, ACTIVE_THEME } from '../constants/theme.js'
+import { getPlatform } from '../utils/platform.js'
 
 const MAX_NAME_LENGTH = 20
 const TOP_PREVIEW = 5
 const DIFFICULTY_TABS = ['easy', 'normal', 'hardcore']
+const PLATFORM_TABS = ['desktop', 'mobile']
 
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : '')
 
-async function getLeaderboard(difficulty) {
-  const res = await fetch(`/api/leaderboard?difficulty=${difficulty}`)
+async function getLeaderboard(difficulty, platform) {
+  const res = await fetch(`/api/leaderboard?difficulty=${difficulty}&platform=${platform}`)
   if (!res.ok) throw new Error(`GET failed (${res.status})`)
   return res.json()
 }
@@ -60,52 +65,58 @@ function LeaderboardList({ status, entries, limit }) {
 }
 
 export default function EndScreen({ score, personalBest, isNewPB, difficulty, onPlayAgain }) {
-  // Top-5 preview — always the difficulty just played.
+  // The player's real platform — used for submit AND as the default board to view.
+  const [myPlatform] = useState(getPlatform)
+
+  // Top-5 preview — the difficulty just played, on the player's own platform.
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [entries, setEntries] = useState([])
   const [name, setName] = useState('')
   const [submitState, setSubmitState] = useState('idle') // idle | posting | done | error
   const [showFull, setShowFull] = useState(false)
 
-  // Full overlay — tabbed across all three difficulties; defaults to played mode.
+  // Full overlay — difficulty tab + platform toggle; both default to the played
+  // mode / detected platform. View-only: never affects what platform is submitted.
   const [activeTab, setActiveTab] = useState(difficulty)
+  const [activePlatform, setActivePlatform] = useState(myPlatform)
   const [tabEntries, setTabEntries] = useState([])
   const [tabStatus, setTabStatus] = useState('loading')
 
   const loadPreview = useCallback(async () => {
     setStatus('loading')
     try {
-      setEntries(await getLeaderboard(difficulty))
+      setEntries(await getLeaderboard(difficulty, myPlatform))
       setStatus('ready')
     } catch {
       setStatus('error')
     }
-  }, [difficulty])
+  }, [difficulty, myPlatform])
 
   useEffect(() => {
     loadPreview()
   }, [loadPreview])
 
-  // Fetch the active tab's standings whenever it changes.
+  // Fetch the active difficulty+platform combination whenever either changes.
   useEffect(() => {
     let cancelled = false
     setTabStatus('loading')
-    getLeaderboard(activeTab)
+    getLeaderboard(activeTab, activePlatform)
       .then((d) => { if (!cancelled) { setTabEntries(d); setTabStatus('ready') } })
       .catch(() => { if (!cancelled) setTabStatus('error') })
     return () => { cancelled = true }
-  }, [activeTab])
+  }, [activeTab, activePlatform])
 
   const handleSubmit = async () => {
     const trimmed = name.trim()
     if (!trimmed) return
     setSubmitState('posting')
     try {
-      await postScore({ name: trimmed, score, theme: ACTIVE_THEME, difficulty })
+      // platform is always the player's real device, never the viewed board.
+      await postScore({ name: trimmed, score, theme: ACTIVE_THEME, difficulty, platform: myPlatform })
       setSubmitState('done')
       loadPreview() // refresh so the player sees their entry
-      if (activeTab === difficulty) {
-        getLeaderboard(difficulty).then(setTabEntries).catch(() => {})
+      if (activeTab === difficulty && activePlatform === myPlatform) {
+        getLeaderboard(difficulty, myPlatform).then(setTabEntries).catch(() => {})
       }
     } catch {
       setSubmitState('error')
@@ -113,7 +124,8 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
   }
 
   const openFull = () => {
-    setActiveTab(difficulty) // always default to the mode just played
+    setActiveTab(difficulty) // default to the mode just played
+    setActivePlatform(myPlatform) // default to the player's own platform
     setShowFull(true)
   }
 
@@ -166,10 +178,10 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
         <p className="text-sm font-semibold text-emerald-400">Added to leaderboard! 🎉</p>
       )}
 
-      {/* Top-5 preview for the difficulty just played */}
+      {/* Top-5 preview for the difficulty just played, on the player's platform */}
       <div className="mt-1 flex flex-col items-center gap-2">
         <span className="text-xs uppercase tracking-widest text-slate-500">
-          Top scores — {cap(difficulty)} mode
+          Top scores — {cap(difficulty)} · {cap(myPlatform)}
         </span>
         <LeaderboardList status={status} entries={entries} limit={TOP_PREVIEW} />
       </div>
@@ -201,6 +213,7 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-2xl font-bold text-slate-100">Leaderboard</h3>
+            {/* Difficulty tabs */}
             <div className="flex items-center gap-2">
               {DIFFICULTY_TABS.map((tab) => {
                 const active = activeTab === tab
@@ -213,6 +226,27 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
                     style={active ? { color: theme.accent } : { color: '#64748b' }}
                   >
                     {cap(tab)}
+                  </button>
+                )
+              })}
+            </div>
+            {/* Platform toggle — independent, view-only pill segmented control */}
+            <div className="flex items-center gap-1 rounded-lg border border-slate-700 p-1">
+              {PLATFORM_TABS.map((p) => {
+                const active = activePlatform === p
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setActivePlatform(p)}
+                    aria-pressed={active}
+                    className="rounded-md px-4 py-1 text-xs font-semibold uppercase tracking-wide transition active:scale-95"
+                    style={
+                      active
+                        ? { backgroundColor: theme.accent, color: '#0f172a' }
+                        : { color: '#94a3b8' }
+                    }
+                  >
+                    {cap(p)}
                   </button>
                 )
               })}
