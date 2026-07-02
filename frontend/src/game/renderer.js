@@ -79,70 +79,53 @@ export function drawSchool(ctx, fishList, camera, predator, detectRadius, settin
   }
 }
 
-// Dark angular predator silhouette, drawn at (x, y) facing `angle`. Coordinate-
-// agnostic like drawFish (game passes screen coords, tutorial passes canvas
-// coords). The nose sits at local x = 28 = SHARK_MOUTH_OFFSET, so the visual
-// front tip lands exactly on the catch point (camera is 1:1). Pure angular
-// shapes — no grey ellipse; a small teal eye gives contrast against the navy.
+// Angular predator, drawn at (x, y) facing `angle`. Coordinate-agnostic like
+// drawFish (game passes screen coords, tutorial passes canvas coords). The sharp
+// nose sits at local x = 28 = SHARK_MOUTH_OFFSET, so the visual front tip lands
+// exactly on the catch point (camera is 1:1).
+//
+// Geometry (Session 10): a single angular quadrilateral body — widest toward the
+// rear-top, tapering to the nose — plus a forked V-tail drawn as its own sub-path
+// with a small gap behind the body. Straight lines only; the red eye is the one
+// circle. Teal outline + soft teal glow keep the dark body legible on navy.
 export function drawShark(ctx, x, y, angle) {
   ctx.save()
   ctx.translate(x, y)
   ctx.rotate(angle)
 
-  // Contrast layers (Session 9): the dark body barely reads against navy on dim
-  // screens, so a teal outline + soft teal shadow glow make it legible without
-  // making it look non-threatening. Coordinates/proportions are unchanged.
   ctx.shadowColor = 'rgba(0, 188, 212, 0.4)'
   ctx.shadowBlur = 12
   ctx.fillStyle = '#0d1f2d'
   ctx.strokeStyle = 'rgba(0, 188, 212, 0.6)'
   ctx.lineWidth = 1.5
 
-  // Main body — angular, not rounded (nose = front tip = mouth point).
+  // Body — angular quadrilateral. Nose (28,0) is the catch point; widest toward
+  // the rear-top; (-18,0) is the rear notch the tail sits behind.
   ctx.beginPath()
-  ctx.moveTo(28, 0)
-  ctx.lineTo(8, -8)
-  ctx.lineTo(-20, -6)
-  ctx.lineTo(-28, 0)
-  ctx.lineTo(-20, 6)
-  ctx.lineTo(8, 8)
+  ctx.moveTo(28, 0) // nose (sharp front point = catch point)
+  ctx.lineTo(-10, -11) // rear-top (widest)
+  ctx.lineTo(-18, 0) // tail base (rear notch)
+  ctx.lineTo(-7, 8) // rear-bottom
   ctx.closePath()
   ctx.fill()
   ctx.stroke()
 
-  // Dorsal fin — tall, raked back.
+  // Forked V-tail — separate sub-path, ~4px gap from the body's rear notch.
   ctx.beginPath()
-  ctx.moveTo(4, -8)
-  ctx.lineTo(0, -22)
-  ctx.lineTo(-14, -6)
+  ctx.moveTo(-22, -3) // upper root
+  ctx.lineTo(-34, -13) // upper tip
+  ctx.lineTo(-27, 0) // inner fork notch
+  ctx.lineTo(-34, 13) // lower tip
+  ctx.lineTo(-22, 3) // lower root
   ctx.closePath()
   ctx.fill()
   ctx.stroke()
 
-  // Tail fin — crescent.
-  ctx.beginPath()
-  ctx.moveTo(-20, -6)
-  ctx.lineTo(-36, -16)
-  ctx.lineTo(-28, 0)
-  ctx.lineTo(-36, 16)
-  ctx.lineTo(-20, 6)
-  ctx.closePath()
-  ctx.fill()
-  ctx.stroke()
-
-  // Pectoral fin — angular sweep.
-  ctx.beginPath()
-  ctx.moveTo(6, 8)
-  ctx.lineTo(0, 18)
-  ctx.lineTo(-12, 8)
-  ctx.closePath()
-  ctx.fill()
-
-  // Eye — small teal dot for heading clarity (no glow on the eye itself).
+  // Eye — small red circle near the front, slightly above center (no glow).
   ctx.shadowBlur = 0
   ctx.beginPath()
-  ctx.arc(16, -3, 2, 0, Math.PI * 2)
-  ctx.fillStyle = '#00BCD4'
+  ctx.arc(18, -3, 2, 0, Math.PI * 2)
+  ctx.fillStyle = '#FF4444'
   ctx.fill()
 
   ctx.restore()
