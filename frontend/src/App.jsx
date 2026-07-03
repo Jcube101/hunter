@@ -464,6 +464,7 @@ export default function App() {
           isNewPB={endData.isNewPB}
           difficulty={difficulty}
           onPlayAgain={startGame}
+          onMenu={quitGame}
         />
       )}
     </div>

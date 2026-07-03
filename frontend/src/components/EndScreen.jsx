@@ -64,7 +64,7 @@ function LeaderboardList({ status, entries, limit }) {
   )
 }
 
-export default function EndScreen({ score, personalBest, isNewPB, difficulty, onPlayAgain }) {
+export default function EndScreen({ score, personalBest, isNewPB, difficulty, onPlayAgain, onMenu }) {
   // The player's real platform — used for submit AND as the default board to view.
   const [myPlatform] = useState(getPlatform)
 
@@ -187,13 +187,24 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
       </div>
 
       <div className="mt-1 flex flex-col items-center gap-3">
-        <button
-          onClick={onPlayAgain}
-          className="rounded-xl px-12 py-3 text-lg font-bold text-slate-900 transition active:scale-95"
-          style={{ backgroundColor: theme.accent }}
-        >
-          Play Again
-        </button>
+        {/* Play Again stays the primary action; Menu is a secondary sibling that
+            returns to the start screen (same transition as Pause → Quit, so
+            attract mode resumes via App's mount logic). */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onPlayAgain}
+            className="rounded-xl px-12 py-3 text-lg font-bold text-slate-900 transition active:scale-95"
+            style={{ backgroundColor: theme.accent }}
+          >
+            Play Again
+          </button>
+          <button
+            onClick={onMenu}
+            className="rounded-xl border border-slate-600 px-6 py-3 text-sm font-semibold text-slate-300 transition active:scale-95"
+          >
+            Menu
+          </button>
+        </div>
         <button
           onClick={openFull}
           className="rounded-xl border border-slate-600 px-8 py-2 text-sm font-semibold text-slate-200 transition active:scale-95"
