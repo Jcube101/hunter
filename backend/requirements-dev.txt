@@ -1,0 +1,3 @@
+# Dev/test-only dependencies (not installed in production).
+pytest
+httpx        # required by fastapi.testclient.TestClient

@@ -230,7 +230,11 @@ chooses to add their score.
 ```
 
 **Validation:**
-- `name`: string, 1–20 characters, stripped of leading/trailing whitespace
+- `name`: untrusted string. Cleaned server-side (`clean_name`): Unicode
+  normalized (NFC); control chars, bidi overrides (e.g. U+202E), and
+  zero-width/BOM chars stripped; internal whitespace collapsed; trimmed. Must be
+  1–20 characters **after cleaning** (a 200-char raw ceiling rejects oversized
+  payloads first). Blank/whitespace/invisible-only → 422.
 - `score`: integer, 0–70 (`Field(..., ge=0, le=70)` — Easy now spawns 70 fish)
 - `theme`: enum — `"ocean"` only in v1
 - `difficulty`: enum — `easy` / `normal` / `hardcore` (defaults to `normal`)
@@ -241,9 +245,21 @@ chooses to add their score.
 { "status": "added" }
 ```
 
-**Response 422:** Pydantic validation failure (malformed request).
+**Response 422:** Pydantic validation failure (malformed/oversized/unsafe input).
 
-No authentication. No rate limiting in v1.
+**Security posture (public, unauthenticated endpoint):**
+- **SQL injection:** not possible — every query is parameterized (`?` placeholders).
+- **XSS:** the API stores the raw (cleaned) name; the React client escapes on
+  render (no `dangerouslySetInnerHTML`), so a name like `<b>hi</b>` is shown as
+  literal text. Server-side cleaning is defense-in-depth, not the XSS boundary.
+- **Rate limiting:** none in-app. The service sits behind the Cloudflare Tunnel,
+  so `request.client.host` is the tunnel (all users share it) — an in-app per-IP
+  limiter would be ineffective/incorrect. **Recommended:** a Cloudflare WAF
+  rate-limiting rule on `POST /api/leaderboard` at the edge (correct client IP,
+  no app changes). Submits are opt-in and capped at 10 per board, so abuse impact
+  is low, but edge rate limiting is the right guard if it becomes a problem.
+
+Covered by the backend test suite (`backend/tests/`, 23 tests) — see Testing below.
 
 ---
 
@@ -344,6 +360,23 @@ Write code on Pi (VS Code)
   → sudo systemctl restart hunter
   → curl /api/health to verify
 ```
+
+### Testing (backend)
+
+Backend API tests live in `backend/tests/` (pytest + FastAPI TestClient). They
+cover the untrusted leaderboard **name-entry** path — acceptance/normalization,
+rejection (blank, over-length, invisible-only, oversized), sanitization (control
+chars, bidi overrides, zero-width, NUL), injection/XSS neutralization — plus
+score/enum validation, GET requirements, and board isolation.
+
+```bash
+cd backend
+.venv/bin/pip install -r requirements-dev.txt   # pytest + httpx (first run only)
+.venv/bin/python -m pytest -q                    # 23 tests
+```
+
+Tests run against a throwaway DB via `HUNTER_DB_PATH`, so `leaderboard.db` is
+never touched. `requirements-dev.txt` is dev-only — not installed in production.
 
 ---
 

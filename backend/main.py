@@ -12,7 +12,9 @@ Architecture notes (see SPEC.md / CLAUDE.md):
 """
 
 import os
+import re
 import sqlite3
+import unicodedata
 from contextlib import asynccontextmanager, contextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -24,12 +26,49 @@ PLATFORMS = {"desktop", "mobile"}
 
 # --- Paths (resolved relative to this file, not the cwd) ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "leaderboard.db")
+# HUNTER_DB_PATH lets tests point at a throwaway DB; prod uses the default.
+DB_PATH = os.environ.get("HUNTER_DB_PATH", os.path.join(BASE_DIR, "leaderboard.db"))
 DIST_DIR = os.path.join(BASE_DIR, "..", "frontend", "dist")
 
 # Score sanity cap = the largest fish count across difficulties (Easy = 70).
 MAX_SCORE = 70
 TOP_N = 10
+
+# --- Display-name safety ----------------------------------------------------
+# Public, unauthenticated submit -> treat the name as untrusted. The React client
+# escapes on render (no XSS) and all SQL is parameterized (no injection), but we
+# still sanitize server-side as defense-in-depth and for clean data:
+#   - an early length ceiling rejects oversized payloads before we process them
+#   - control chars, bidi overrides (e.g. U+202E RLO), and zero-width/BOM chars
+#     are stripped (they enable display spoofing and broken layout, never a
+#     legitimate display name)
+#   - Unicode is normalized (NFC) and internal whitespace collapsed
+#   - the real 1..MAX_NAME_LENGTH limit is enforced AFTER cleaning
+MAX_NAME_LENGTH = 20
+NAME_RAW_CEILING = 200  # reject absurd payloads before cleaning
+
+
+def _is_unsafe_name_char(ch):
+    """True for characters never valid in a public display name."""
+    o = ord(ch)
+    return (
+        o < 0x20                      # C0 control chars (incl. tab/newline/NUL)
+        or 0x7F <= o <= 0x9F          # DEL + C1 controls
+        or 0x200B <= o <= 0x200F      # zero-width space/joiners + LRM/RLM
+        or 0x202A <= o <= 0x202E      # bidi embeddings/overrides (LRE..RLO)
+        or 0x2066 <= o <= 0x2069      # bidi isolates (LRI..PDI)
+        or o == 0x2060                # word joiner
+        or o == 0xFEFF                # BOM / zero-width no-break space
+    )
+
+
+def clean_name(raw):
+    """Canonicalize + strip unsafe/invisible chars + collapse whitespace + trim."""
+    text = unicodedata.normalize("NFC", raw)
+    text = "".join(ch for ch in text if not _is_unsafe_name_char(ch))
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -111,7 +150,9 @@ def insert_entry(name, score, theme, difficulty, platform):
 # --- Request model ----------------------------------------------------------
 
 class LeaderboardEntry(BaseModel):
-    name: str = Field(..., min_length=1, max_length=20)
+    # NAME_RAW_CEILING is an early guard against oversized payloads; the real
+    # 1..MAX_NAME_LENGTH limit is enforced after cleaning in the validator.
+    name: str = Field(..., min_length=1, max_length=NAME_RAW_CEILING)
     score: int = Field(..., ge=0, le=MAX_SCORE)
     theme: str = Field(default="ocean")
     difficulty: str = Field(default="normal")
@@ -119,11 +160,13 @@ class LeaderboardEntry(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def strip_name(cls, v):
-        stripped = v.strip()
-        if not stripped:
+    def clean_and_check_name(cls, v):
+        cleaned = clean_name(v)
+        if not cleaned:
             raise ValueError("name must not be blank")
-        return stripped
+        if len(cleaned) > MAX_NAME_LENGTH:
+            raise ValueError(f"name must be at most {MAX_NAME_LENGTH} characters")
+        return cleaned
 
     @field_validator("theme")
     @classmethod
