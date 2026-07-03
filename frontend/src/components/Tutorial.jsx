@@ -18,19 +18,19 @@ const TEAL = '#00BCD4'
 const SLIDES = [
   {
     title: 'Predator Instinct',
-    body: 'Speed and instinct decide who wins this one.',
+    body: 'They scatter the moment they sense you. React quicker than they can.',
     w: 200,
     h: 120,
   },
   {
-    title: 'Move Your Shark',
-    body: 'On mobile, press and drag anywhere in the bottom-left corner; the joystick is invisible. On desktop, your shark follows the mouse cursor.',
+    title: 'On the Prowl',
+    body: 'On mobile, press and drag anywhere in the bottom-left corner; the joystick is invisible. On desktop, the predator follows the mouse cursor.',
     w: 260,
     h: 130,
   },
   {
     title: '60 Seconds',
-    body: 'Catch as many fish as you can before time runs out. Good luck.',
+    body: 'Catch as many as you can before time runs out. Good luck.',
     w: 120,
     h: 120,
   },

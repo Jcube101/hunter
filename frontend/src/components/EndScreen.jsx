@@ -132,7 +132,7 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6 text-center">
       <h2 className="text-4xl font-bold text-slate-100 sm:text-5xl">
-        You caught <span style={{ color: theme.accent }}>{score}</span> fish
+        You caught <span style={{ color: theme.accent }}>{score}</span>
       </h2>
       {difficulty && (
         <p className="-mt-3 text-sm font-medium uppercase tracking-wider text-slate-500">

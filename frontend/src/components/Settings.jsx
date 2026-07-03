@@ -65,8 +65,8 @@ export function Settings({ onClose }) {
       <div className="flex flex-col items-center gap-3">
         <span className="text-xs uppercase tracking-widest text-slate-500">Visual Assists</span>
         <Toggle
-          label="Glow on fleeing fish"
-          description="Highlights fish within range"
+          label="Glow on fleeing prey"
+          description="Highlights nearby prey"
           on={glow}
           onChange={(v) => toggle(GLOW_KEY, v, setGlow)}
         />
