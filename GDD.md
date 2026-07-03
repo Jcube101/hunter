@@ -116,12 +116,19 @@ Full-screen overlay, same dark navy background.
 ### Visual Assists
 | Setting | Key | Default | Description |
 |---|---|---|---|
-| Glow on fleeing fish | hunter_setting_glow | false | Canvas shadowBlur on teal fish while fleeing |
+| Glow on fleeing prey | hunter_setting_glow | true | Bright pale-cyan halo (canvas shadowBlur 14) on fleeing prey. The halo colour is deliberately LIGHTER than the teal body so it reads as a distinct glow. |
 
-Flee radius circle removed — not useful enough to justify UI space.
+### Audio
+| Setting | Key | Default | Description |
+|---|---|---|---|
+| Sound | hunter_setting_audio | true | Ambient loop + all SFX. Off = full silence. Also toggleable from the start-screen speaker icon and the pause screen. |
+
+Both settings are a single source of truth read live (see SPEC.md → Client-Side
+Storage): toggling from any UI takes effect immediately everywhere. Flee-radius
+circle removed — not useful enough to justify UI space.
 
 ### v2 Settings (not built yet)
-- Fleeing fish color selection (teal default, pink, gold, red)
+- Fleeing-prey glow colour selection (cyan default, pink, gold, red)
 - Sound volume slider
 
 ---
@@ -480,17 +487,23 @@ the max possible score is 70.
 
 ## Sound Design
 
-Three sounds in v1. All optional — mute toggle on start screen.
-Mute state persisted in localStorage key `hunter_mute`.
+Real mp3 assets in `public/audio/`. Audio on/off is a single setting
+(`hunter_setting_audio`, default ON), toggleable from three places that share
+state: the start-screen speaker icon, the Settings panel, and the Pause screen.
+Off = full silence (ambient **and** all SFX).
 
 | Sound | Trigger | Character |
 |---|---|---|
-| Ambient loop | Game running | Light atmospheric texture, 400–800Hz range — non-haunting, suggests water without being eerie |
-| Catch | Fish caught | Short satisfying chomp |
-| Timer end | 0:00 reached | Distinct, recognisable end tone |
+| Ambient loop | Start screen + gameplay + pause | Light atmospheric texture — suggests water without being eerie |
+| Catch | Prey caught | Short satisfying pop |
+| Timer end | 0:00 reached | Distinct end tone |
+| Congrats | New personal best | Short celebratory sting |
 
-Use Tone.js for generated sounds or CC0 audio files.
-Sounds must not autoplay before user interaction (browser policy).
+The ambient loop plays on the start screen (behind attract mode) and **carries
+through into gameplay seamlessly** — it is never stopped/restarted on the
+start→play or play↔pause transitions, only on game-over. Audio cannot autoplay
+before a user gesture (browser policy), so the first interaction anywhere on the
+page unlocks it (one-time listener); a direct toggle tap also starts it.
 
 ---
 

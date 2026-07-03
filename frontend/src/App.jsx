@@ -30,6 +30,7 @@ import { updateCamera, worldToScreen } from './game/camera.js'
 import { drawBackground, drawSchool, drawShark, drawMinimap } from './game/renderer.js'
 import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
 import { theme } from './constants/theme.js'
+import { isGlowOn } from './settings.js'
 import {
   FISH_COUNT,
   WORLD_WIDTH_MULTIPLIER,
@@ -49,7 +50,6 @@ import {
 
 const DIFFICULTY_KEY = 'hunter_difficulty'
 const TUTORIAL_KEY = 'hunter_tutorial_seen'
-const SETTING_GLOW_KEY = 'hunter_setting_glow'
 
 export default function App() {
   const [screen, setScreen] = useState('start') // start | playing | paused | end
@@ -78,10 +78,9 @@ export default function App() {
     localStorage.setItem(DIFFICULTY_KEY, d)
   }, [])
   const fleeSettingsRef = useRef(DIFFICULTY_SETTINGS[DEFAULT_DIFFICULTY])
-  // Visual-assist settings (glow on fleeing fish), read from localStorage at game
-  // start and frozen for the game — changing it takes effect next game. Default
-  // ON (overwritten each startGame; this initial value is just a safe default).
-  const settingsRef = useRef({ glow: true })
+  // Glow (visual assist) is NOT snapshotted here — the draw loop reads it live
+  // from the single source of truth (settings.js `isGlowOn()`) every frame, so
+  // the toggle can never go stale.
 
   // Canvas + minimap elements
   const canvasRef = useRef(null)
@@ -258,7 +257,7 @@ export default function App() {
       cam,
       predatorRef.current,
       fleeSettingsRef.current.FLEE_RADIUS,
-      settingsRef.current,
+      { glow: isGlowOn() }, // live single source — read every frame, never frozen
     )
     const ss = worldToScreen(predatorRef.current.x, predatorRef.current.y, cam)
     drawShark(ctx, ss.x, ss.y, predatorRef.current.angle)
@@ -281,13 +280,6 @@ export default function App() {
     // Lock the difficulty's fish-flee settings for this game (selector is
     // start-screen only). Shark speed is constant (SHARK_SPEED) in all modes.
     fleeSettingsRef.current = DIFFICULTY_SETTINGS[difficulty]
-
-    // Snapshot the visual-assist settings for this game (frozen for its duration).
-    // Default ON: getItem returns null for an unset key, and null !== 'false' is
-    // true, so glow is on unless the player explicitly turned it off.
-    settingsRef.current = {
-      glow: localStorage.getItem(SETTING_GLOW_KEY) !== 'false',
-    }
 
     await enter() // fullscreen + landscape lock (best effort)
 
@@ -327,15 +319,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enter, init, start, setGameState, sizeCanvas, difficulty])
 
+  // Ambient keeps looping seamlessly across start <-> playing <-> paused; only a
+  // game-over stops it (endGame). So pause/resume/quit don't touch the ambient.
   function pauseGame() {
     stop()
-    soundRef.current.stopAmbient()
     setGameState('paused')
   }
 
   const resumeGame = useCallback(async () => {
     await enter()
-    soundRef.current.playAmbient()
     setGameState('playing')
     start()
   }, [enter, start, setGameState])
@@ -343,7 +335,6 @@ export default function App() {
   const quitGame = useCallback(() => {
     stop()
     exit()
-    soundRef.current.stopAmbient()
     setGameState('start')
   }, [stop, exit, setGameState])
 
@@ -391,6 +382,25 @@ export default function App() {
     }
   }, [sizeCanvas])
 
+  // Ambient loop on the start screen (and seamlessly onward — playAmbient never
+  // restarts a loop that's already running). Fires on every entry to 'start'.
+  useEffect(() => {
+    if (screen === 'start') soundRef.current.playAmbient()
+  }, [screen])
+
+  // Autoplay unlock: browsers block audio before any user gesture, so a fresh
+  // page load can't start the ambient on its own. The first interaction anywhere
+  // resumes it (idempotent — playAmbient no-ops if already playing or audio off).
+  useEffect(() => {
+    const unlock = () => soundRef.current.playAmbient()
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
   // Dev-only test hook: expose live game refs for browser verification.
   // Vite replaces import.meta.env.DEV with false in production and strips this.
   useEffect(() => {
@@ -407,7 +417,7 @@ export default function App() {
         inputPosRef,
         joystickRef,
         fleeSettingsRef,
-        settingsRef,
+        isGlowOn, // live single-source glow accessor (for verification)
         sharkSpeed: SHARK_SPEED,
       }
     }
@@ -442,8 +452,8 @@ export default function App() {
           onLeaderboard={() => {}} // start-screen leaderboard overlay — not in v1
           onHowToPlay={() => setShowTutorial(true)}
           onOpenSettings={() => setShowSettings(true)}
-          muted={sound.muted}
-          onToggleMute={sound.toggleMute}
+          audioOn={sound.audioOn}
+          onToggleAudio={sound.toggleAudio}
           difficulty={difficulty}
           onSelectDifficulty={selectDifficulty}
         />
@@ -451,12 +461,25 @@ export default function App() {
       {/* Portrait rotation hint — start screen only, touch + portrait, once/session. */}
       {screen === 'start' && <RotationToast />}
       {/* Settings — over the start screen, below the tutorial (z-order). */}
-      {screen === 'start' && showSettings && <Settings onClose={() => setShowSettings(false)} />}
+      {screen === 'start' && showSettings && (
+        <Settings
+          onClose={() => setShowSettings(false)}
+          audioOn={sound.audioOn}
+          onToggleAudio={sound.toggleAudio}
+        />
+      )}
       {/* First-play tutorial — over the start screen only (top of the stack). */}
       {screen === 'start' && showTutorial && (
         <Tutorial onDone={() => setShowTutorial(false)} />
       )}
-      {screen === 'paused' && <PauseScreen onResume={resumeGame} onQuit={quitGame} />}
+      {screen === 'paused' && (
+        <PauseScreen
+          onResume={resumeGame}
+          onQuit={quitGame}
+          audioOn={sound.audioOn}
+          onToggleAudio={sound.toggleAudio}
+        />
+      )}
       {screen === 'end' && (
         <EndScreen
           score={endData.score}

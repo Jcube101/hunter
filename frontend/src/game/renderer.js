@@ -28,7 +28,11 @@ const FISH_CALM_COLOR = '#E8EDF0' // body, white/silver — not within flee radi
 const FISH_FLEE_COLOR = '#00BCD4' // body, teal — within FLEE_RADIUS of the predator
 const FISH_CALM_TAIL = '#C0C8D0' // tail block, calm (lighter than body)
 const FISH_FLEE_TAIL = '#00A0B4' // tail block, fleeing (darker teal)
-const FISH_GLOW_BLUR = 8 // shadowBlur px when the glow assist is on
+// Glow assist: a bright halo, deliberately LIGHTER than the teal body so it reads
+// as a distinct glow (a same-teal halo around a teal fish was near-invisible — the
+// reason the toggle looked like it did nothing). Larger blur so it's obvious.
+const FISH_GLOW_COLOR = '#9BF6FF' // pale cyan — pops against both navy and the teal body
+const FISH_GLOW_BLUR = 14 // shadowBlur px when the glow assist is on
 
 // One fish, drawn at (x, y) facing `angle`. Coordinate-agnostic: the game passes
 // screen coords (camera-transformed), the tutorial passes canvas coords.
@@ -44,7 +48,7 @@ export function drawFish(ctx, x, y, angle, isFleeing, settings = {}) {
   ctx.rotate(angle)
 
   if (isFleeing && settings.glow) {
-    ctx.shadowColor = FISH_FLEE_COLOR
+    ctx.shadowColor = FISH_GLOW_COLOR
     ctx.shadowBlur = FISH_GLOW_BLUR
   } else {
     ctx.shadowBlur = 0

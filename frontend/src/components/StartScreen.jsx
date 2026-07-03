@@ -14,8 +14,8 @@ export default function StartScreen({
   onLeaderboard,
   onHowToPlay,
   onOpenSettings,
-  muted,
-  onToggleMute,
+  audioOn,
+  onToggleAudio,
   difficulty,
   onSelectDifficulty,
 }) {
@@ -56,13 +56,15 @@ export default function StartScreen({
         ⚙
       </button>
 
-      {/* Mute toggle — top-right, icon only, persisted in localStorage */}
+      {/* Audio toggle — top-right, quick access. Shares state with the Settings
+          and Pause toggles (all read/write the same source). */}
       <button
-        onClick={onToggleMute}
-        aria-label={muted ? 'Unmute' : 'Mute'}
+        onClick={onToggleAudio}
+        aria-label={audioOn ? 'Turn sound off' : 'Turn sound on'}
+        aria-pressed={audioOn}
         className="absolute right-4 top-4 rounded-lg border border-slate-700 px-3 py-2 text-xl leading-none text-slate-200 transition active:scale-95"
       >
-        {muted ? '🔇' : '🔊'}
+        {audioOn ? '🔊' : '🔇'}
       </button>
 
       <h1

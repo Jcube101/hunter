@@ -1,14 +1,13 @@
 // Settings.jsx — full-screen settings overlay. UI only, no game logic.
 //
-// One visual-assist toggle (glow on fleeing fish), default ON and persisted in
-// localStorage. App reads the key at game start; changing it takes effect on the
-// next game. Stored value is "true"/"false"; an unset key reads as ON (=== the
-// default) via `!== 'false'`, so a fresh browser gets the glow.
+// Two toggles (glow on fleeing prey, audio), both default ON. All settings live
+// in the single source of truth (src/settings.js) and are read live by the game /
+// audio hook — this panel just reads the current value and writes changes back
+// through the same accessors, so nothing can go stale.
 
 import { useState } from 'react'
 import { theme } from '../constants/theme.js'
-
-const GLOW_KEY = 'hunter_setting_glow'
+import { isGlowOn, setGlowOn } from '../settings.js'
 
 // Clean on/off switch — teal when on, grey when off; label left, switch right.
 function Toggle({ label, description, on, onChange }) {
@@ -35,13 +34,12 @@ function Toggle({ label, description, on, onChange }) {
   )
 }
 
-export function Settings({ onClose }) {
-  // Default ON: only an explicit "false" turns it off (unset -> on).
-  const [glow, setGlow] = useState(() => localStorage.getItem(GLOW_KEY) !== 'false')
-
-  const toggle = (key, value, setter) => {
-    setter(value)
-    localStorage.setItem(key, String(value))
+export function Settings({ onClose, audioOn, onToggleAudio }) {
+  // Glow reads/writes the single source of truth; the game reads it live.
+  const [glow, setGlow] = useState(isGlowOn)
+  const changeGlow = (v) => {
+    setGlow(v)
+    setGlowOn(v)
   }
 
   return (
@@ -68,11 +66,21 @@ export function Settings({ onClose }) {
           label="Glow on fleeing prey"
           description="Highlights nearby prey"
           on={glow}
-          onChange={(v) => toggle(GLOW_KEY, v, setGlow)}
+          onChange={changeGlow}
         />
         <p className="mt-1 max-w-xs text-xs text-slate-500">
           These assist with visibility. Enabled by default.
         </p>
+      </div>
+
+      <div className="flex flex-col items-center gap-3">
+        <span className="text-xs uppercase tracking-widest text-slate-500">Audio</span>
+        <Toggle
+          label="Sound"
+          description="Ambient loop and effects"
+          on={audioOn}
+          onChange={onToggleAudio}
+        />
       </div>
 
       <button
