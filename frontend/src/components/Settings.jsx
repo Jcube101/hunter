@@ -1,8 +1,9 @@
 // Settings.jsx — full-screen settings overlay. UI only, no game logic.
 //
-// One visual-assist toggle (glow on fleeing fish), default off and persisted in
+// One visual-assist toggle (glow on fleeing fish), default ON and persisted in
 // localStorage. App reads the key at game start; changing it takes effect on the
-// next game.
+// next game. Stored value is "true"/"false"; an unset key reads as ON (=== the
+// default) via `!== 'false'`, so a fresh browser gets the glow.
 
 import { useState } from 'react'
 import { theme } from '../constants/theme.js'
@@ -35,7 +36,8 @@ function Toggle({ label, description, on, onChange }) {
 }
 
 export function Settings({ onClose }) {
-  const [glow, setGlow] = useState(() => localStorage.getItem(GLOW_KEY) === 'true')
+  // Default ON: only an explicit "false" turns it off (unset -> on).
+  const [glow, setGlow] = useState(() => localStorage.getItem(GLOW_KEY) !== 'false')
 
   const toggle = (key, value, setter) => {
     setter(value)
@@ -69,7 +71,7 @@ export function Settings({ onClose }) {
           onChange={(v) => toggle(GLOW_KEY, v, setGlow)}
         />
         <p className="mt-1 max-w-xs text-xs text-slate-500">
-          These assist with visibility. Disabled by default.
+          These assist with visibility. Enabled by default.
         </p>
       </div>
 

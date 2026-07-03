@@ -78,8 +78,9 @@ export default function App() {
   }, [])
   const fleeSettingsRef = useRef(DIFFICULTY_SETTINGS[DEFAULT_DIFFICULTY])
   // Visual-assist settings (glow on fleeing fish), read from localStorage at game
-  // start and frozen for the game — changing it takes effect next game.
-  const settingsRef = useRef({ glow: false })
+  // start and frozen for the game — changing it takes effect next game. Default
+  // ON (overwritten each startGame; this initial value is just a safe default).
+  const settingsRef = useRef({ glow: true })
 
   // Canvas + minimap elements
   const canvasRef = useRef(null)
@@ -281,10 +282,10 @@ export default function App() {
     fleeSettingsRef.current = DIFFICULTY_SETTINGS[difficulty]
 
     // Snapshot the visual-assist settings for this game (frozen for its duration).
-    // getItem returns null for an unset key, and null === 'true' is false, so glow
-    // is off unless the player explicitly enabled it.
+    // Default ON: getItem returns null for an unset key, and null !== 'false' is
+    // true, so glow is on unless the player explicitly turned it off.
     settingsRef.current = {
-      glow: localStorage.getItem(SETTING_GLOW_KEY) === 'true',
+      glow: localStorage.getItem(SETTING_GLOW_KEY) !== 'false',
     }
 
     await enter() // fullscreen + landscape lock (best effort)

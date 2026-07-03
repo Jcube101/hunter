@@ -291,7 +291,7 @@ change is acceptable.
 | `hunter_mute` | localStorage | `"true"` / `"false"` | On mute toggle |
 | `hunter_difficulty` | localStorage | `easy` / `normal` / `hardcore` | On difficulty select |
 | `hunter_tutorial_seen` | localStorage | `"true"` | After tutorial completed or skipped |
-| `hunter_setting_glow` | localStorage | `"false"` | Glow on fleeing fish toggle |
+| `hunter_setting_glow` | localStorage | `"true"` / `"false"` | Glow on fleeing fish toggle (default ON — unset reads as on via `!== 'false'`) |
 | `hunter_rotation_toast_shown` | sessionStorage | `"true"` | After the portrait toast is shown (once per session) |
 
 The old global `hunter_pb` key is retired (ignored if present). No cookies.

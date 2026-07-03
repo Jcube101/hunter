@@ -23,10 +23,10 @@ const SLIDES = [
     h: 120,
   },
   {
-    title: 'Use the Joystick',
-    body: 'Press and drag in the bottom-left corner to move your shark. The joystick is invisible — just press anywhere in that area and drag.',
-    w: 120,
-    h: 120,
+    title: 'Move Your Shark',
+    body: 'On mobile, press and drag anywhere in the bottom-left corner — the joystick is invisible. On desktop, your shark follows the mouse cursor.',
+    w: 260,
+    h: 130,
   },
   {
     title: '60 Seconds',
@@ -46,33 +46,42 @@ function drawSchoolScene(ctx, w, h) {
     [92, 62], [52, 80], [78, 82], [102, 74],
   ]
   for (const [x, y] of fish) drawFish(ctx, x, y, Math.PI * 0.98, false, {})
-  drawShark(ctx, 168, 60, Math.PI) // nose points left toward the school
+  // Shark faces left toward the school AND stays right-side up (dorsal fin up).
+  // The sprite is vertically asymmetric, so a 180° rotation would point the nose
+  // left but flip it upside down; a horizontal mirror points it left with the
+  // dorsal fin still on top — matching how the shark reads in gameplay.
+  ctx.save()
+  ctx.translate(168, 60)
+  ctx.scale(-1, 1)
+  drawShark(ctx, 0, 0, 0)
+  ctx.restore()
 }
 
-// Slide 2: the invisible joystick made visible — base ring, offset knob, arrow.
-function drawJoystickScene(ctx, w, h) {
-  ctx.clearRect(0, 0, w, h)
-  const cx = w / 2
-  const cy = h / 2
+// Slide 2 shows BOTH control schemes side by side: the invisible mobile joystick
+// (left) and desktop mouse-follow (right), so the shark's controls read the same
+// on either device. Each panel reuses the same simple canvas primitives.
+
+// The invisible joystick made visible — base ring, offset knob, teal arrow.
+function drawJoystick(ctx, cx, cy) {
   // Base ring
   ctx.strokeStyle = 'rgba(255,255,255,0.4)'
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.arc(cx, cy, 32, 0, Math.PI * 2)
+  ctx.arc(cx, cy, 30, 0, Math.PI * 2)
   ctx.stroke()
   // Knob, pushed toward upper-right
-  const kx = cx + 15
-  const ky = cy - 15
+  const kx = cx + 14
+  const ky = cy - 14
   ctx.fillStyle = 'rgba(255,255,255,0.6)'
   ctx.beginPath()
-  ctx.arc(kx, ky, 14, 0, Math.PI * 2)
+  ctx.arc(kx, ky, 13, 0, Math.PI * 2)
   ctx.fill()
   // Direction arrow (teal)
   ctx.strokeStyle = TEAL
   ctx.fillStyle = TEAL
   ctx.lineWidth = 2
-  const ax = kx + 20
-  const ay = ky - 20
+  const ax = kx + 18
+  const ay = ky - 18
   ctx.beginPath()
   ctx.moveTo(kx + 6, ky - 6)
   ctx.lineTo(ax, ay)
@@ -83,6 +92,74 @@ function drawJoystickScene(ctx, w, h) {
   ctx.lineTo(ax - 2, ay + 8)
   ctx.closePath()
   ctx.fill()
+}
+
+// A classic pointer cursor with its tip (hotspot) at (x, y).
+function drawCursor(ctx, x, y) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(0, 0)
+  ctx.lineTo(0, 15)
+  ctx.lineTo(4, 11)
+  ctx.lineTo(7, 17)
+  ctx.lineTo(9.5, 16)
+  ctx.lineTo(6.5, 10)
+  ctx.lineTo(12, 10)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+  ctx.restore()
+}
+
+// Desktop scheme: the shark chases the mouse cursor. A small shark points at a
+// cursor, with a dotted teal trail between them showing the follow.
+function drawMouseFollow(ctx, cx, cy) {
+  const sx = cx - 18 // shark, lower-left of the panel
+  const sy = cy + 12
+  const curX = cx + 26 // cursor tip, upper-right
+  const curY = cy - 20
+  const angle = Math.atan2(curY - sy, curX - sx)
+
+  // Dotted trail from just ahead of the shark's nose to the cursor.
+  const nose = 28 * 0.62
+  const nx = sx + Math.cos(angle) * nose
+  const ny = sy + Math.sin(angle) * nose
+  ctx.strokeStyle = TEAL
+  ctx.lineWidth = 2
+  ctx.setLineDash([3, 4])
+  ctx.beginPath()
+  ctx.moveTo(nx, ny)
+  ctx.lineTo(curX - 3, curY + 4)
+  ctx.stroke()
+  ctx.setLineDash([])
+
+  // Shark, scaled down, nose pointed at the cursor.
+  ctx.save()
+  ctx.translate(sx, sy)
+  ctx.scale(0.62, 0.62)
+  drawShark(ctx, 0, 0, angle)
+  ctx.restore()
+
+  drawCursor(ctx, curX, curY)
+}
+
+// Slide 2: both control panels + small labels.
+function drawControlsScene(ctx, w, h) {
+  ctx.clearRect(0, 0, w, h)
+  const cy = h / 2 - 8
+  drawJoystick(ctx, w * 0.27, cy)
+  drawMouseFollow(ctx, w * 0.72, cy)
+  // Labels
+  ctx.fillStyle = '#64748b'
+  ctx.font = '11px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('Touch', w * 0.27, h - 12)
+  ctx.fillText('Mouse', w * 0.72, h - 12)
 }
 
 // Slide 3: a circular countdown arc that drains over 4s and loops, 60 -> 57.
@@ -137,7 +214,7 @@ export default function Tutorial({ onDone }) {
       return undefined
     }
     if (index === 1) {
-      drawJoystickScene(ctx, w, h)
+      drawControlsScene(ctx, w, h)
       return undefined
     }
     let raf
