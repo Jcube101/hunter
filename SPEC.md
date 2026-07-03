@@ -290,19 +290,18 @@ change is acceptable.
 | `hunter_pb_hardcore` | localStorage | integer | PB for Hardcore mode |
 | `hunter_difficulty` | localStorage | `easy` / `normal` / `hardcore` | On difficulty select |
 | `hunter_tutorial_seen` | localStorage | `"true"` | After tutorial completed or skipped |
-| `hunter_setting_glow` | localStorage | `"true"` / `"false"` | Glow-on-fleeing-prey toggle (default ON, unset reads on via `!== 'false'`) |
 | `hunter_setting_audio` | localStorage | `"true"` / `"false"` | Audio on/off toggle (default ON). Replaces the legacy `hunter_mute` (migrated once if a mute preference existed) |
 | `hunter_rotation_toast_shown` | sessionStorage | `"true"` | After the portrait toast is shown (once per session) |
 
 The old global `hunter_pb` key is retired (ignored if present). No cookies.
 `sessionStorage` is used only for the once-per-session rotation toast. No IndexedDB.
 
-The `hunter_setting_glow` and `hunter_setting_audio` preferences are owned by a
-single source of truth — `src/settings.js` — which caches them in memory and
-mirrors to localStorage. Every consumer (settings panel, the render loop, the
-audio hook, the start/pause toggles) reads the **same live value** through its
-accessors (`isGlowOn`/`isAudioOn`), so a toggle takes effect immediately and can
-never go stale. The glow is read every frame by the draw loop.
+The `hunter_setting_audio` preference is owned by a single source of truth —
+`src/settings.js` — which caches it in memory and mirrors to localStorage. Every
+consumer (settings panel, the audio hook, the start/pause toggles) reads the
+**same live value** through `isAudioOn()`, so a toggle takes effect immediately
+and can never go stale. (The glow-on-fleeing-prey setting was removed in
+Session 15 — glow is now permanent, applied unconditionally by the renderer.)
 
 ---
 

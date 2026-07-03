@@ -40,14 +40,16 @@ const FISH_GLOW_BLUR = 14 // shadowBlur px when the glow assist is on
 // Geometry (Session 10): a compact kite/diamond body — sharp point at the nose
 // (front) and rear, widest in the middle — plus a small separate rhombus tail
 // block behind the rear point, in a lighter colour. Straight lines only, no eye.
-// Body/tail swap to teal shades when fleeing; the fleeing body glows only when
-// settings.glow is on.
-export function drawFish(ctx, x, y, angle, isFleeing, settings = {}) {
+// Body/tail swap to teal shades when fleeing, and a fleeing fish always glows
+// (the glow assist is permanent — Session 15 removed the toggle). `glow` defaults
+// on; attract mode passes false as a local override so its background fish stay
+// flat for smooth idle rendering.
+export function drawFish(ctx, x, y, angle, isFleeing, glow = true) {
   ctx.save()
   ctx.translate(x, y)
   ctx.rotate(angle)
 
-  if (isFleeing && settings.glow) {
+  if (isFleeing && glow) {
     ctx.shadowColor = FISH_GLOW_COLOR
     ctx.shadowBlur = FISH_GLOW_BLUR
   } else {
@@ -79,14 +81,14 @@ export function drawFish(ctx, x, y, angle, isFleeing, settings = {}) {
 
 // Draw the whole school through the camera. Colours each fish by whether it is
 // within `detectRadius` (the current difficulty's FLEE_RADIUS) of the predator.
-export function drawSchool(ctx, fishList, camera, predator, detectRadius, settings) {
+export function drawSchool(ctx, fishList, camera, predator, detectRadius) {
   const fr2 = detectRadius * detectRadius
   for (const fish of fishList) {
     const s = worldToScreen(fish.x, fish.y, camera)
     const dx = fish.x - predator.x
     const dy = fish.y - predator.y
     const isFleeing = dx * dx + dy * dy < fr2
-    drawFish(ctx, s.x, s.y, headingOf(fish), isFleeing, settings)
+    drawFish(ctx, s.x, s.y, headingOf(fish), isFleeing) // glow always on when fleeing
   }
 }
 

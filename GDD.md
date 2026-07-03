@@ -113,22 +113,23 @@ Front nose tip is the catch point — aligns with SHARK_MOUTH_OFFSET = 28.
 Accessible via gear icon on start screen, top-left corner.
 Full-screen overlay, same dark navy background.
 
-### Visual Assists
-| Setting | Key | Default | Description |
-|---|---|---|---|
-| Glow on fleeing prey | hunter_setting_glow | true | Bright pale-cyan halo (canvas shadowBlur 14) on fleeing prey. The halo colour is deliberately LIGHTER than the teal body so it reads as a distinct glow. |
+### Glow on fleeing prey (permanent, no toggle)
+A bright pale-cyan halo (canvas shadowBlur 14, `#9BF6FF` — deliberately lighter
+than the teal body so it reads as a distinct glow) is drawn on every fleeing fish,
+unconditionally. The old glow toggle was removed in Session 15 (it wasn't worth
+further UI/debug time); glow is now always on. Attract-mode background fish are the
+one exception — they pass a local `glow=false` for smooth idle rendering.
 
 ### Audio
 | Setting | Key | Default | Description |
 |---|---|---|---|
-| Sound | hunter_setting_audio | true | Ambient loop + all SFX. Off = full silence. Also toggleable from the start-screen speaker icon and the pause screen. |
+| Sound | hunter_setting_audio | true | Ambient loop + all SFX. Off = full silence. Toggleable from the start-screen speaker icon, the Settings panel, and the pause screen. |
 
-Both settings are a single source of truth read live (see SPEC.md → Client-Side
-Storage): toggling from any UI takes effect immediately everywhere. Flee-radius
-circle removed — not useful enough to justify UI space.
+Audio is a single source of truth read live (see SPEC.md → Client-Side Storage):
+toggling from any UI takes effect immediately everywhere. Flee-radius circle
+removed — not useful enough to justify UI space.
 
 ### v2 Settings (not built yet)
-- Fleeing-prey glow colour selection (cyan default, pink, gold, red)
 - Sound volume slider
 
 ---

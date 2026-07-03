@@ -1,13 +1,11 @@
 // Settings.jsx — full-screen settings overlay. UI only, no game logic.
 //
-// Two toggles (glow on fleeing prey, audio), both default ON. All settings live
-// in the single source of truth (src/settings.js) and are read live by the game /
-// audio hook — this panel just reads the current value and writes changes back
-// through the same accessors, so nothing can go stale.
+// One toggle (audio), default ON. It lives in the single source of truth
+// (src/settings.js) and is read live by the audio hook — this panel just reads
+// the current value and writes changes back through the shared accessor.
+// (The glow toggle was removed in Session 15; glow is now permanent.)
 
-import { useState } from 'react'
 import { theme } from '../constants/theme.js'
-import { isGlowOn, setGlowOn } from '../settings.js'
 
 // Clean on/off switch — teal when on, grey when off; label left, switch right.
 function Toggle({ label, description, on, onChange }) {
@@ -35,13 +33,6 @@ function Toggle({ label, description, on, onChange }) {
 }
 
 export function Settings({ onClose, audioOn, onToggleAudio }) {
-  // Glow reads/writes the single source of truth; the game reads it live.
-  const [glow, setGlow] = useState(isGlowOn)
-  const changeGlow = (v) => {
-    setGlow(v)
-    setGlowOn(v)
-  }
-
   return (
     <div
       className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-6 px-6 text-center"
@@ -59,19 +50,6 @@ export function Settings({ onClose, audioOn, onToggleAudio }) {
       <h1 className="text-4xl font-extrabold tracking-[0.2em]" style={{ color: theme.accent }}>
         SETTINGS
       </h1>
-
-      <div className="flex flex-col items-center gap-3">
-        <span className="text-xs uppercase tracking-widest text-slate-500">Visual Assists</span>
-        <Toggle
-          label="Glow on fleeing prey"
-          description="Highlights nearby prey"
-          on={glow}
-          onChange={changeGlow}
-        />
-        <p className="mt-1 max-w-xs text-xs text-slate-500">
-          These assist with visibility. Enabled by default.
-        </p>
-      </div>
 
       <div className="flex flex-col items-center gap-3">
         <span className="text-xs uppercase tracking-widest text-slate-500">Audio</span>

@@ -45,7 +45,7 @@ function drawSchoolScene(ctx, w, h) {
     [46, 44], [68, 38], [90, 46], [42, 62], [66, 60],
     [92, 62], [52, 80], [78, 82], [102, 74],
   ]
-  for (const [x, y] of fish) drawFish(ctx, x, y, Math.PI * 0.98, false, {})
+  for (const [x, y] of fish) drawFish(ctx, x, y, Math.PI * 0.98, false)
   // Shark faces left toward the school AND stays right-side up (dorsal fin up).
   // The sprite is vertically asymmetric, so a 180° rotation would point the nose
   // left but flip it upside down; a horizontal mirror points it left with the

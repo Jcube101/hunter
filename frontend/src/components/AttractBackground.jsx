@@ -55,9 +55,9 @@ export default function AttractBackground() {
       for (const f of fish) {
         const dx = f.x - shark.x
         const dy = f.y - shark.y
-        // No glow ({}) here on purpose — shadowBlur per-fish is the costly path,
-        // and this is an idle background where smoothness matters most.
-        drawFish(ctx, f.x, f.y, Math.atan2(f.vy, f.vx), dx * dx + dy * dy < fr2, {})
+        // glow=false: local override so the idle background stays flat (shadowBlur
+        // per-fish is the costly path). In-game fleeing fish still glow by default.
+        drawFish(ctx, f.x, f.y, Math.atan2(f.vy, f.vx), dx * dx + dy * dy < fr2, false)
       }
       drawShark(ctx, shark.x, shark.y, shark.angle)
     }

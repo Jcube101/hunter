@@ -30,7 +30,6 @@ import { updateCamera, worldToScreen } from './game/camera.js'
 import { drawBackground, drawSchool, drawShark, drawMinimap } from './game/renderer.js'
 import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
 import { theme } from './constants/theme.js'
-import { isGlowOn } from './settings.js'
 import {
   FISH_COUNT,
   WORLD_WIDTH_MULTIPLIER,
@@ -78,9 +77,8 @@ export default function App() {
     localStorage.setItem(DIFFICULTY_KEY, d)
   }, [])
   const fleeSettingsRef = useRef(DIFFICULTY_SETTINGS[DEFAULT_DIFFICULTY])
-  // Glow (visual assist) is NOT snapshotted here — the draw loop reads it live
-  // from the single source of truth (settings.js `isGlowOn()`) every frame, so
-  // the toggle can never go stale.
+  // Glow on fleeing fish is permanent (Session 15 removed the toggle) — the
+  // renderer applies it unconditionally, so there's no glow state here.
 
   // Canvas + minimap elements
   const canvasRef = useRef(null)
@@ -251,14 +249,7 @@ export default function App() {
       )
       shakeRef.current -= 1
     }
-    drawSchool(
-      ctx,
-      fishRef.current,
-      cam,
-      predatorRef.current,
-      fleeSettingsRef.current.FLEE_RADIUS,
-      { glow: isGlowOn() }, // live single source — read every frame, never frozen
-    )
+    drawSchool(ctx, fishRef.current, cam, predatorRef.current, fleeSettingsRef.current.FLEE_RADIUS)
     const ss = worldToScreen(predatorRef.current.x, predatorRef.current.y, cam)
     drawShark(ctx, ss.x, ss.y, predatorRef.current.angle)
     drawParticles(ctx, particlesRef.current, cam)
@@ -417,7 +408,6 @@ export default function App() {
         inputPosRef,
         joystickRef,
         fleeSettingsRef,
-        isGlowOn, // live single-source glow accessor (for verification)
         sharkSpeed: SHARK_SPEED,
       }
     }
