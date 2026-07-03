@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import StartScreen from './components/StartScreen.jsx'
 import AttractBackground from './components/AttractBackground.jsx'
 import EndScreen from './components/EndScreen.jsx'
+import { LeaderboardOverlay } from './components/Leaderboard.jsx'
 import PauseScreen from './components/PauseScreen.jsx'
 import Tutorial from './components/Tutorial.jsx'
 import { Settings } from './components/Settings.jsx'
@@ -58,6 +59,7 @@ export default function App() {
     () => localStorage.getItem(TUTORIAL_KEY) !== 'true',
   )
   const [showSettings, setShowSettings] = useState(false)
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
   const stateRef = useRef('start')
   const setGameState = useCallback((s) => {
     stateRef.current = s
@@ -439,7 +441,7 @@ export default function App() {
       {screen === 'start' && (
         <StartScreen
           onPlay={startGame}
-          onLeaderboard={() => {}} // start-screen leaderboard overlay — not in v1
+          onLeaderboard={() => setShowLeaderboard(true)}
           onHowToPlay={() => setShowTutorial(true)}
           onOpenSettings={() => setShowSettings(true)}
           audioOn={sound.audioOn}
@@ -447,6 +449,10 @@ export default function App() {
           difficulty={difficulty}
           onSelectDifficulty={selectDifficulty}
         />
+      )}
+      {/* Leaderboard overlay — start screen (opened by the Leaderboard button). */}
+      {screen === 'start' && showLeaderboard && (
+        <LeaderboardOverlay difficulty={difficulty} onClose={() => setShowLeaderboard(false)} />
       )}
       {/* Portrait rotation hint — start screen only, touch + portrait, once/session. */}
       {screen === 'start' && <RotationToast />}

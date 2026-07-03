@@ -47,9 +47,9 @@ Start Screen
   → Timer hits 0:00 OR all prey caught → game ends
   → End Screen
       → Score displayed
-      → Personal best check (localStorage)
-      → If new PB → "Add to leaderboard?" prompt
-  → Play Again
+      → Personal best check (localStorage) → "New personal best!" flourish
+      → If score qualifies for top 10 → "Add to leaderboard?" prompt
+  → Play Again / Menu
 ```
 
 ---
@@ -143,8 +143,9 @@ Three separate PB keys — one per difficulty:
 
 PB compared against the key matching the difficulty just played.
 The old global hunter_pb key is retired — ignored if present.
-"New personal best!" and leaderboard submit prompt only triggers
-when the current game's score beats the matching difficulty PB.
+The "New personal best!" flourish triggers when the current game's score beats
+the matching difficulty PB. (The leaderboard submit prompt is separate — it
+triggers on top-10 qualification; see Opt-in Submit Flow.)
 
 ---
 
@@ -364,13 +365,14 @@ Never hardcode these values inline anywhere else.
 - Timer frozen while paused
 
 ### End Screen
-- **"You caught X fish"** — large, prominent
+- **"You caught X"** — large, prominent
 - **Personal best** — pulled from localStorage
 - If new personal best: **"New personal best! 🎉"**
-- If new PB: **"Add to leaderboard?"** → name input (max 20 chars) → Submit
+- If the score qualifies for the top 10 (see Opt-in Submit Flow): **"Add to
+  leaderboard?"** → name input (max 20 chars) → Submit
 - **Top 5 preview for the difficulty just played** (fetched from API)
-- **Play Again** button
-- **Full Leaderboard** button (three tabs: Easy / Normal / Hardcore)
+- **Play Again** and **Menu** buttons
+- **Full Leaderboard** button → shared overlay (difficulty tabs + platform toggle)
 
 ---
 
@@ -462,12 +464,23 @@ The `platform` column was added in Session 11; adding it wiped all prior scores
 
 ### Opt-in Submit Flow
 1. Game ends
-2. New PB detected (local check only)
-3. "Add to leaderboard?" shown with name input
+2. The end screen fetches the player's own board (difficulty + platform, top 10)
+3. **Qualification check** (Session 16): the "Add to leaderboard?" prompt shows if
+   the score would make the top 10 — the board has fewer than 10 entries, or the
+   score is ≥ the 10th-place score (ties qualify; the backend resolves ordering).
+   This is independent of personal best — a PB that doesn't crack the top 10 shows
+   no prompt; a top-10 score that isn't a PB does.
 4. Player enters name (max 20 chars) → Submit
 5. POST /api/leaderboard with {name, score, theme, difficulty, platform}
 6. Confirmation shown — "Added!"
-7. If not new PB or player skips: nothing is sent. Ever.
+7. If it doesn't qualify or the player skips: nothing is sent. Ever.
+
+Personal best (`hunter_pb_<difficulty>`, localStorage) is still tracked and still
+drives the "New personal best! 🎉" flourish — that flourish and the submit prompt
+are now two independent things.
+
+The **start-screen Leaderboard button** and the end-screen "Full Leaderboard"
+button both open the same overlay (difficulty tabs + view-only platform toggle).
 
 ### API Endpoints
 
