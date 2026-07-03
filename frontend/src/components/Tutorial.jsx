@@ -17,14 +17,14 @@ const TEAL = '#00BCD4'
 
 const SLIDES = [
   {
-    title: 'Chase the School',
-    body: 'A school of fish is hiding in the ocean. Hunt them down.',
+    title: 'Predator Instinct',
+    body: 'Speed and instinct decide who wins this one.',
     w: 200,
     h: 120,
   },
   {
     title: 'Move Your Shark',
-    body: 'On mobile, press and drag anywhere in the bottom-left corner — the joystick is invisible. On desktop, your shark follows the mouse cursor.',
+    body: 'On mobile, press and drag anywhere in the bottom-left corner; the joystick is invisible. On desktop, your shark follows the mouse cursor.',
     w: 260,
     h: 130,
   },

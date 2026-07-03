@@ -75,23 +75,26 @@ export default function StartScreen({
       </h1>
 
       <p className={`max-w-sm text-slate-300 ${isCompact ? 'text-sm' : 'text-base'}`}>
-        Chase the school. Catch as many as you can.
+        Outmaneuver. Outsmart. Outscore.
       </p>
 
-      {/* Theme selector — Ocean active, Sky locked until v2 */}
-      <div className="flex items-center gap-3">
+      {/* Theme selector — Ocean only, centered. Sky returns in v2 (commented
+          out below so it drops back in when the second theme ships). */}
+      <div className="flex items-center justify-center gap-3">
         <button
           className="rounded-lg border-2 px-5 py-2 text-sm font-semibold"
           style={{ borderColor: theme.accent, color: theme.accent }}
         >
           Ocean
         </button>
+        {/* Sky v2 — hidden until the second theme ships (Hunter v2 roadmap).
         <button
           disabled
           className="cursor-not-allowed rounded-lg border-2 border-slate-700 px-5 py-2 text-sm font-semibold text-slate-600"
         >
           Sky <span className="ml-1 text-xs opacity-70">v2</span>
         </button>
+        */}
       </div>
 
       {/* Difficulty selector — single select, persisted in localStorage */}

@@ -42,7 +42,7 @@ function LeaderboardList({ status, entries, limit }) {
   if (status === 'loading') return <p className="text-sm text-slate-400">Loading…</p>
   if (status === 'error') return <p className="text-sm text-rose-400">Couldn&apos;t load scores</p>
   if (status === 'ready' && entries.length === 0) {
-    return <p className="text-sm text-slate-400">No scores yet — be the first!</p>
+    return <p className="text-sm text-slate-400">No scores yet. Be the first!</p>
   }
   return (
     <ol className="flex w-64 flex-col gap-1">
@@ -170,7 +170,7 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
             {submitState === 'posting' ? 'Adding…' : 'Add to leaderboard'}
           </button>
           {submitState === 'error' && (
-            <span className="text-xs text-rose-400">Something went wrong — try again</span>
+            <span className="text-xs text-rose-400">Something went wrong. Try again</span>
           )}
         </div>
       )}
@@ -181,7 +181,7 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
       {/* Top-5 preview for the difficulty just played, on the player's platform */}
       <div className="mt-1 flex flex-col items-center gap-2">
         <span className="text-xs uppercase tracking-widest text-slate-500">
-          Top scores — {cap(difficulty)} · {cap(myPlatform)}
+          Top scores: {cap(difficulty)} · {cap(myPlatform)}
         </span>
         <LeaderboardList status={status} entries={entries} limit={TOP_PREVIEW} />
       </div>
