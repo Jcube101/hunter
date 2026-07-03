@@ -330,9 +330,12 @@ Never hardcode these values inline anywhere else.
 ## Screen Architecture
 
 ### Start Screen
+- **Attract-mode background** — an autonomous Boids simulation runs behind the
+  UI (see *Attract Mode* below). Purely decorative.
 - Game title: **HUNTER**
-- Theme selector: Ocean button (active, v1) / Sky button (locked, v2)
-- One-line instruction: *"Chase the school. Catch as many as you can."*
+- Theme selector: hidden in v1 (Ocean is the only theme; the selector, with the
+  locked Sky button, is commented out and returns in v2)
+- One-line tagline: *"Outmaneuver. Outsmart. Outscore."*
 - **Play** button (triggers fullscreen + game start)
 - **Leaderboard** button (shows global top 10 overlay)
 - "Best in landscape" nudge (subtle, not a hard block)
@@ -360,6 +363,36 @@ Never hardcode these values inline anywhere else.
 - **Top 5 preview for the difficulty just played** (fetched from API)
 - **Play Again** button
 - **Full Leaderboard** button (three tabs: Easy / Normal / Hardcore)
+
+---
+
+## Attract Mode (Start-Screen Background)
+
+A decorative, autonomous Boids simulation that plays behind the start-screen UI,
+showing the flocking algorithm in motion before the player takes control. It is
+**not** a real round: no score, no timer, no leaderboard, no personal best, no
+sound, and no player input.
+
+- **Trigger:** runs whenever the start screen is visible — starts on mount, with
+  no idle timer or separate state machine. Stops when the player taps Play and
+  restarts on return to the start screen (quit-to-menu or reload). Pauses while
+  the browser tab is hidden (`visibilitychange`) to save CPU/battery.
+- **Fish:** reuse the exact game Boids math (separation / alignment / cohesion /
+  edge repulsion / anchor) and flee from the autonomous predator. A lighter,
+  fixed count (`ATTRACT_FISH_COUNT`), independent of `FISH_COUNT` /
+  `DIFFICULTY_SETTINGS`, so difficulty rebalancing never affects the idle scene.
+- **Predator AI:** semi-intelligent — seeks the nearest fish blended with a
+  wandering heading (`ATTRACT_WANDER_WEIGHT` / `ATTRACT_WANDER_TURN`) so it never
+  moves robotically. On proximity (`ATTRACT_CATCH_RADIUS`) it "catches" a fish,
+  which **respawns elsewhere** — nothing is removed, no score, no particles.
+  Confined to the visible viewport (no extended world, no camera-follow).
+- **Rendering:** reuses `drawFish()` / `drawShark()` unchanged; glow is off in
+  attract mode for smooth idle performance. Canvas is `pointer-events: none` and
+  layered beneath all UI so it never intercepts taps.
+- **Isolation:** its own `<canvas>` + `requestAnimationFrame` loop
+  (`AttractBackground.jsx` + pure `game/attract.js`), completely separate from the
+  real game's `useGameLoop` / `useBoids` / camera. All tuning in
+  `constants/boids.js` under the `ATTRACT_*` prefix.
 
 ---
 

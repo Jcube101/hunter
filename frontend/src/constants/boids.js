@@ -103,3 +103,15 @@ export const MINIMAP_VIEWPORT_FRACTION = 0.15
 // Catch detection is disabled for this long at game start so the school can
 // scatter from the shared center spawn before the player can score (GDD.md).
 export const GRACE_PERIOD = 2000 // ms
+
+// --- Attract mode (decorative start-screen simulation) ----------------------
+// A self-contained, autonomous Boids demo that runs behind the start screen.
+// Deliberately SEPARATE from DIFFICULTY_SETTINGS / FISH_COUNT so rebalancing the
+// real game never touches the idle background by accident. Not a real round: no
+// score, no timer, no leaderboard, no sound. The autonomous shark seeks the
+// nearest fish with a wander blend; caught fish respawn (nothing is removed).
+export const ATTRACT_FISH_COUNT = 40 // lighter than any difficulty, tuned for smooth idle
+export const ATTRACT_SHARK_SPEED = 3.2 // px/frame — brisk but calmer than the game's 3.8
+export const ATTRACT_CATCH_RADIUS = 20 // px — mouth-to-fish distance that triggers a respawn
+export const ATTRACT_WANDER_WEIGHT = 0.45 // blend of random wander vs. seek-nearest (0 = pure seek)
+export const ATTRACT_WANDER_TURN = 0.25 // rad/frame — max drift of the wander heading (organic curl)

@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import StartScreen from './components/StartScreen.jsx'
+import AttractBackground from './components/AttractBackground.jsx'
 import EndScreen from './components/EndScreen.jsx'
 import PauseScreen from './components/PauseScreen.jsx'
 import Tutorial from './components/Tutorial.jsx'
@@ -431,6 +432,10 @@ export default function App() {
         <HUD score={displayScore} timeLeft={displayTime} difficulty={difficulty} />
       )}
 
+      {/* Attract mode — autonomous Boids sim behind the start-screen UI. Mounted
+          only on the start screen, so it stops on play and restarts on return.
+          Rendered before StartScreen so it layers underneath (pointer-events-none). */}
+      {screen === 'start' && <AttractBackground />}
       {screen === 'start' && (
         <StartScreen
           onPlay={startGame}
