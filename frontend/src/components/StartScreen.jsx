@@ -78,8 +78,9 @@ export default function StartScreen({
         Outmaneuver. Outsmart. Outscore.
       </p>
 
-      {/* Theme selector — Ocean only, centered. Sky returns in v2 (commented
-          out below so it drops back in when the second theme ships). */}
+      {/* Theme selector hidden until v2 ships a second theme (Hunter v2
+          roadmap). Ocean is the only theme in v1, so there is nothing to pick;
+          restore this block (Ocean + Sky) when themes become selectable.
       <div className="flex items-center justify-center gap-3">
         <button
           className="rounded-lg border-2 px-5 py-2 text-sm font-semibold"
@@ -87,15 +88,14 @@ export default function StartScreen({
         >
           Ocean
         </button>
-        {/* Sky v2 — hidden until the second theme ships (Hunter v2 roadmap).
         <button
           disabled
           className="cursor-not-allowed rounded-lg border-2 border-slate-700 px-5 py-2 text-sm font-semibold text-slate-600"
         >
           Sky <span className="ml-1 text-xs opacity-70">v2</span>
         </button>
-        */}
       </div>
+      */}
 
       {/* Difficulty selector — single select, persisted in localStorage */}
       <div className="flex flex-col items-center gap-1.5">
