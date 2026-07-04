@@ -14,7 +14,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { theme, ACTIVE_THEME } from '../constants/theme.js'
 import { getPlatform } from '../utils/platform.js'
-import { getLeaderboard, postScore, cap, LeaderboardList, LeaderboardOverlay } from './Leaderboard.jsx'
+import {
+  getLeaderboard,
+  postScore,
+  cap,
+  qualifies as qualifiesForBoard,
+  LeaderboardList,
+  LeaderboardOverlay,
+} from './Leaderboard.jsx'
 
 const MAX_NAME_LENGTH = 20
 const TOP_PREVIEW = 5
@@ -47,7 +54,7 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
   }, [loadPreview])
 
   // Qualifies for the top 10: room on the board, or score >= the last (10th) score.
-  const qualifies = entries.length < BOARD_SIZE || score >= entries[entries.length - 1].score
+  const qualifies = status === 'ready' ? qualifiesForBoard(entries, score, BOARD_SIZE) : false
   // Show the submit prompt once we know the board. If the fetch failed we can't
   // check, so fall back to the old personal-best rule rather than block a submit.
   const canSubmit =

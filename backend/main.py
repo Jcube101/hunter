@@ -19,7 +19,7 @@ from contextlib import asynccontextmanager, contextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 DIFFICULTIES = {"easy", "normal", "hardcore"}
 PLATFORMS = {"desktop", "mobile"}
@@ -28,10 +28,19 @@ PLATFORMS = {"desktop", "mobile"}
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # HUNTER_DB_PATH lets tests point at a throwaway DB; prod uses the default.
 DB_PATH = os.environ.get("HUNTER_DB_PATH", os.path.join(BASE_DIR, "leaderboard.db"))
-DIST_DIR = os.path.join(BASE_DIR, "..", "frontend", "dist")
+# HUNTER_DIST_DIR lets tests point at a throwaway fixture dir (so the
+# StaticFiles-mounted-last invariant can be tested without touching the real
+# production frontend/dist/); prod uses the default.
+DIST_DIR = os.environ.get("HUNTER_DIST_DIR", os.path.join(BASE_DIR, "..", "frontend", "dist"))
 
-# Score sanity cap = the largest fish count across difficulties (Easy = 70).
-MAX_SCORE = 70
+# Per-difficulty score ceiling = that difficulty's fish count (mirrors
+# frontend/src/constants/boids.js FISH_COUNT). A score above a mode's own fish
+# count is impossible and would otherwise be silently accepted by a single
+# global cap (Session 18 fix — see SPEC.md).
+MAX_SCORE_BY_DIFFICULTY = {"easy": 70, "normal": 60, "hardcore": 50}
+# Top-level Field ceiling (the loosest of the three); the real per-difficulty
+# check runs in LeaderboardEntry.check_score_ceiling below.
+MAX_SCORE = max(MAX_SCORE_BY_DIFFICULTY.values())
 TOP_N = 10
 
 # --- Display-name safety ----------------------------------------------------
@@ -193,6 +202,16 @@ class LeaderboardEntry(BaseModel):
             raise ValueError("platform must be desktop or mobile")
         return v
 
+    @model_validator(mode="after")
+    def check_score_ceiling(self):
+        # Runs after every field validator, so self.difficulty is already
+        # normalized/validated. Per-difficulty ceiling (Session 18 fix): a
+        # score above a mode's own fish count is impossible.
+        ceiling = MAX_SCORE_BY_DIFFICULTY.get(self.difficulty, MAX_SCORE)
+        if self.score > ceiling:
+            raise ValueError(f"score must be at most {ceiling} for difficulty '{self.difficulty}'")
+        return self
+
 
 # --- API routes (declared FIRST, before StaticFiles) ------------------------
 
@@ -208,7 +227,16 @@ def get_leaderboard(difficulty: str | None = None, platform: str | None = None):
     Both params are required. Each of the three difficulty boards is split by
     platform (desktop/mobile) because desktop play is harder — scores across
     platforms aren't comparable. Missing or invalid difficulty/platform -> 400.
+
+    Normalized to lowercase before validation (Session 18 fix) so this behaves
+    the same as the POST body's difficulty/platform fields, which already
+    lowercase — previously `?difficulty=EASY` was rejected as invalid while
+    POST {"difficulty": "EASY"} was accepted.
     """
+    if difficulty is not None:
+        difficulty = difficulty.lower()
+    if platform is not None:
+        platform = platform.lower()
     if difficulty not in DIFFICULTIES:
         raise HTTPException(
             status_code=400,

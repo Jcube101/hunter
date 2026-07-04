@@ -443,8 +443,9 @@ API: GET /api/leaderboard?difficulty=easy|normal|hardcore&platform=desktop|mobil
      POST /api/leaderboard — body includes required `platform`
 
 ### Storage
-- **Personal best:** localStorage key `hunter_pb` — score as integer.
-  Never sent to server unless player opts in.
+- **Personal best:** localStorage keys `hunter_pb_<difficulty>` (one per
+  difficulty — see "Personal Best" above) — score as integer. Never sent to
+  server unless player opts in.
 - **Global leaderboard:** SQLite on Pi at `backend/leaderboard.db`
 
 ### Schema
@@ -494,8 +495,9 @@ POST /api/leaderboard    → {name, score, theme, difficulty, platform} → 201
 
 Top 10 per difficulty+platform (6 boards). No pagination. No delete. No auth.
 
-POST /api/leaderboard score max: 70 (was 50) — Easy now spawns 70 fish, so
-the max possible score is 70.
+POST /api/leaderboard score max is per-difficulty (Session 18), matching each
+mode's fish count: Easy ≤70, Normal ≤60, Hardcore ≤50. A single global cap of
+70 previously let an impossible score through on Normal/Hardcore boards.
 
 ---
 

@@ -235,7 +235,11 @@ chooses to add their score.
   zero-width/BOM chars stripped; internal whitespace collapsed; trimmed. Must be
   1–20 characters **after cleaning** (a 200-char raw ceiling rejects oversized
   payloads first). Blank/whitespace/invisible-only → 422.
-- `score`: integer, 0–70 (`Field(..., ge=0, le=70)` — Easy now spawns 70 fish)
+- `score`: integer, `ge=0`, and capped **per difficulty** at that mode's fish
+  count (Session 18): Easy ≤70, Normal ≤60, Hardcore ≤50 — a score above a
+  mode's own fish count is impossible. Enforced by a model validator that runs
+  after `difficulty` is parsed/normalized, so it applies regardless of field
+  order in the request body.
 - `theme`: enum — `"ocean"` only in v1
 - `difficulty`: enum — `easy` / `normal` / `hardcore` (defaults to `normal`)
 - `platform`: enum — `desktop` / `mobile`, **required** (invalid → 422)
@@ -259,7 +263,7 @@ chooses to add their score.
   no app changes). Submits are opt-in and capped at 10 per board, so abuse impact
   is low, but edge rate limiting is the right guard if it becomes a problem.
 
-Covered by the backend test suite (`backend/tests/`, 23 tests) — see Testing below.
+Covered by the backend test suite (`backend/tests/`, 40 tests) — see Testing below.
 
 ---
 
@@ -367,16 +371,22 @@ Backend API tests live in `backend/tests/` (pytest + FastAPI TestClient). They
 cover the untrusted leaderboard **name-entry** path — acceptance/normalization,
 rejection (blank, over-length, invisible-only, oversized), sanitization (control
 chars, bidi overrides, zero-width, NUL), injection/XSS neutralization — plus
-score/enum validation, GET requirements, and board isolation.
+score/enum validation (including the per-difficulty score ceiling), GET
+requirements (including case-insensitive difficulty/platform params), board
+isolation, health, empty/tied/exact-boundary boards, field defaults, the
+one-time destructive schema migration (`init_db()`), and the
+StaticFiles-mounted-last route ordering invariant.
 
 ```bash
 cd backend
 .venv/bin/pip install -r requirements-dev.txt   # pytest + httpx (first run only)
-.venv/bin/python -m pytest -q                    # 23 tests
+.venv/bin/python -m pytest -q                    # 40 tests
 ```
 
-Tests run against a throwaway DB via `HUNTER_DB_PATH`, so `leaderboard.db` is
-never touched. `requirements-dev.txt` is dev-only — not installed in production.
+Tests run against a throwaway DB via `HUNTER_DB_PATH` (and, for the
+StaticFiles ordering test, a throwaway fixture dir via `HUNTER_DIST_DIR`), so
+`leaderboard.db` and the real `frontend/dist/` are never touched.
+`requirements-dev.txt` is dev-only — not installed in production.
 
 ---
 

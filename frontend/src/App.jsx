@@ -30,6 +30,8 @@ import { useSound } from './hooks/useSound.js'
 import { updateCamera, worldToScreen } from './game/camera.js'
 import { drawBackground, drawSchool, drawShark, drawMinimap } from './game/renderer.js'
 import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
+import { stepPredator, resolveCatches } from './game/predator.js'
+import { isNewPersonalBest } from './utils/personalBest.js'
 import { theme } from './constants/theme.js'
 import {
   FISH_COUNT,
@@ -39,11 +41,8 @@ import {
   SHARK_SPEED,
   DIFFICULTY_SETTINGS,
   DEFAULT_DIFFICULTY,
-  HITBOX_RADIUS,
-  SHARK_MOUTH_OFFSET,
   SHAKE_FRAMES,
   SHAKE_OFFSET,
-  ROTATION_VELOCITY_THRESHOLD,
   MINIMAP_VIEWPORT_FRACTION,
   GRACE_PERIOD,
 } from './constants/boids.js'
@@ -142,41 +141,15 @@ export default function App() {
   }, [])
 
   // --- Predator movement -----------------------------------------------------
+  // Math lives in game/predator.js (extracted Session 18 for unit testing) —
+  // this is just ref glue, identical to the previous inline implementation.
   const movePredator = useCallback((dt) => {
-    const p = predatorRef.current
-    const world = worldRef.current
-    const input = inputPosRef.current
-
-    let vx = 0
-    let vy = 0
-    if (input && input.isJoystick) {
-      // Joystick (mobile): velocity ∝ stick displacement. |dx,dy| in [0,1], so
-      // the shark crawls near center and hits full speed at the rim.
-      vx = input.dx * SHARK_SPEED * dt
-      vy = input.dy * SHARK_SPEED * dt
-    } else {
-      // Mouse (desktop): move toward the world-space target, never overshoot.
-      const target = input || { x: p.x, y: p.y }
-      const dx = target.x - p.x
-      const dy = target.y - p.y
-      const dist = Math.hypot(dx, dy)
-      if (dist > 0) {
-        const step = Math.min(SHARK_SPEED * dt, dist)
-        vx = (dx / dist) * step
-        vy = (dy / dist) * step
-      }
-    }
-
-    let nx = p.x + vx
-    let ny = p.y + vy
-    // Hard stop at world bounds (GDD.md): zero the velocity that hit the wall.
-    if (nx < 0) { nx = 0; vx = 0 } else if (nx > world.width) { nx = world.width; vx = 0 }
-    if (ny < 0) { ny = 0; vy = 0 } else if (ny > world.height) { ny = world.height; vy = 0 }
-
-    let angle = p.angle
-    if (Math.hypot(vx, vy) > ROTATION_VELOCITY_THRESHOLD) angle = Math.atan2(vy, vx)
-
-    predatorRef.current = { x: nx, y: ny, vx, vy, angle }
+    predatorRef.current = stepPredator(
+      predatorRef.current,
+      inputPosRef.current,
+      worldRef.current,
+      dt,
+    )
   }, [predatorRef, worldRef, inputPosRef])
 
   // --- Per-frame update ------------------------------------------------------
@@ -188,22 +161,14 @@ export default function App() {
     cameraRef.current = updateCamera(predatorRef.current, worldRef.current, viewportRef.current)
 
     // Catch detection (disabled during the spawn grace period — Fix 3).
+    // Math lives in game/predator.js (extracted Session 18 for unit testing).
     if (!graceRef.current) {
-      const p = predatorRef.current
-      const mouthX = p.x + Math.cos(p.angle) * SHARK_MOUTH_OFFSET
-      const mouthY = p.y + Math.sin(p.angle) * SHARK_MOUTH_OFFSET
-      const survivors = []
-      let caughtAny = false
-      for (const f of fishRef.current) {
-        if (Math.hypot(mouthX - f.x, mouthY - f.y) < HITBOX_RADIUS) {
+      const { survivors, caught } = resolveCatches(fishRef.current, predatorRef.current)
+      if (caught.length > 0) {
+        for (const f of caught) {
           particlesRef.current = particlesRef.current.concat(spawnParticles(f.x, f.y))
-          scoreRef.current += 1
-          caughtAny = true
-        } else {
-          survivors.push(f)
         }
-      }
-      if (caughtAny) {
+        scoreRef.current += caught.length
         fishRef.current = survivors
         shakeRef.current = SHAKE_FRAMES
         soundRef.current.playCatch() // after grace (catch block is grace-gated)
@@ -341,7 +306,7 @@ export default function App() {
     const pbKey = `hunter_pb_${difficulty}`
     const currentPB = parseInt(localStorage.getItem(pbKey) || '0', 10)
     const score = scoreRef.current
-    const isNewPB = score > currentPB
+    const isNewPB = isNewPersonalBest(score, currentPB)
     if (isNewPB) localStorage.setItem(pbKey, String(score))
     // Game-over tone always; on a new PB, follow it with a congrats sting.
     soundRef.current.playEnd()

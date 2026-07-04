@@ -33,6 +33,14 @@ export async function postScore(entry) {
   return res.json()
 }
 
+// Does `score` qualify for a `boardSize`-entry board of `entries` (sorted desc)?
+// Room on the board, or >= the last (lowest-ranked) entry's score — ties qualify
+// (the backend resolves final ordering). Extracted from EndScreen (Session 18)
+// so it can be unit tested directly; behavior unchanged.
+export function qualifies(entries, score, boardSize) {
+  return entries.length < boardSize || score >= entries[entries.length - 1].score
+}
+
 // Ranked list with shared loading / empty / error states. Single-board, so rows
 // show only rank · name · score (the mode is stated by the header/tab).
 export function LeaderboardList({ status, entries, limit }) {

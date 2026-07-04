@@ -3,13 +3,7 @@
 
 import { theme } from '../constants/theme.js'
 import { LOW_TIME_THRESHOLD } from '../constants/boids.js'
-
-function formatTime(seconds) {
-  const t = Math.max(0, Math.ceil(seconds))
-  const mm = Math.floor(t / 60)
-  const ss = String(t % 60).padStart(2, '0')
-  return `${mm}:${ss}`
-}
+import { formatTime } from '../utils/time.js'
 
 export default function HUD({ score, timeLeft, difficulty }) {
   const low = timeLeft <= LOW_TIME_THRESHOLD
