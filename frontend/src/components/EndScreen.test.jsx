@@ -26,8 +26,13 @@ function setDesktop() {
   Object.defineProperty(navigator, 'maxTouchPoints', { value: 0, configurable: true })
 }
 
+function setOnline(online) {
+  Object.defineProperty(navigator, 'onLine', { value: online, configurable: true })
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
+  setOnline(true) // reset to jsdom's default so other test files aren't affected
 })
 
 describe('EndScreen submit-qualification wiring', () => {
@@ -61,24 +66,83 @@ describe('EndScreen submit-qualification wiring', () => {
     expect(await screen.findByPlaceholderText('Your name')).toBeInTheDocument()
   })
 
-  // KNOWN TO BE REVISITED (ROADMAP.md Session 19 addendum A6) — do not treat
-  // this as a settled contract. It pins TODAY's behavior: a rejected fetch
-  // (network error OR simply offline — the component can't currently tell
-  // them apart) falls back to the personal-best rule and shows the submit
-  // prompt. A6 argues that's wrong once offline is a normal state rather than
-  // an anomaly: a qualifying score reaches a POST that's guaranteed to fail
-  // and is silently lost, with no way to retry. When A6's offline-queue work
-  // lands, this bare-rejection case should split into "transient error →
-  // this PB-fallback path" vs "genuinely offline (navigator.onLine === false)
-  // → queue the submission instead," and this test's premise will need to
-  // change to reflect that split.
-  it('falls back to the personal-best rule when the preview fetch fails (pins current behavior — see ROADMAP A6 before treating this as settled)', async () => {
+  // Session 21 implements the A6 split this test used to just pin: "fetch
+  // failed" and "offline" are now distinguished via navigator.onLine. This
+  // case is ONLINE but the fetch itself failed (server hiccup, CORS, etc.) —
+  // that's a transient error, so the personal-best fallback still applies.
+  // See the offline-specific tests below for the other branch.
+  it('online but the preview fetch fails: falls back to the personal-best rule', async () => {
     setDesktop()
+    setOnline(true)
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
     render(
       <EndScreen score={3} personalBest={3} isNewPB onPlayAgain={() => {}} onMenu={() => {}} difficulty="easy" />,
     )
     expect(await screen.findByPlaceholderText('Your name')).toBeInTheDocument()
+  })
+
+  describe('offline (ROADMAP A6 — submission is a dead end, not a fallback)', () => {
+    it('never shows the name input, even when the score is a new personal best', async () => {
+      setDesktop()
+      setOnline(false)
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+      render(
+        <EndScreen score={99} personalBest={99} isNewPB onPlayAgain={() => {}} onMenu={() => {}} difficulty="easy" />,
+      )
+      // Let the (failing) preview fetch settle so this isn't just the loading state.
+      await waitFor(() => expect(screen.getByText(/top scores/i)).toBeInTheDocument())
+      expect(screen.queryByPlaceholderText('Your name')).not.toBeInTheDocument()
+    })
+
+    it('shows a clear offline message instead of the submit prompt', async () => {
+      setDesktop()
+      setOnline(false)
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+      render(
+        <EndScreen score={5} personalBest={0} isNewPB={false} onPlayAgain={() => {}} onMenu={() => {}} difficulty="easy" />,
+      )
+      expect(await screen.findByText(/offline/i)).toBeInTheDocument()
+    })
+
+    it('never attempts a POST', async () => {
+      setDesktop()
+      setOnline(false)
+      const fn = vi.fn().mockRejectedValue(new Error('offline'))
+      vi.stubGlobal('fetch', fn)
+      render(
+        <EndScreen score={5} personalBest={0} isNewPB={false} onPlayAgain={() => {}} onMenu={() => {}} difficulty="easy" />,
+      )
+      await screen.findByText(/offline/i)
+      expect(fn.mock.calls.some(([, opts]) => opts && opts.method === 'POST')).toBe(false)
+    })
+
+    it('still shows the personal-best flourish — it is purely local and does not depend on connectivity', async () => {
+      setDesktop()
+      setOnline(false)
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+      render(
+        <EndScreen score={99} personalBest={99} isNewPB onPlayAgain={() => {}} onMenu={() => {}} difficulty="easy" />,
+      )
+      expect(await screen.findByText(/new personal best/i)).toBeInTheDocument()
+    })
+
+    it('retries the preview fetch when connectivity returns', async () => {
+      setDesktop()
+      setOnline(false)
+      const fn = vi.fn().mockRejectedValue(new Error('offline'))
+      vi.stubGlobal('fetch', fn)
+      render(
+        <EndScreen score={5} personalBest={0} isNewPB={false} onPlayAgain={() => {}} onMenu={() => {}} difficulty="easy" />,
+      )
+      await screen.findByText(/offline/i)
+      expect(fn).toHaveBeenCalledTimes(1) // initial (failed) preview fetch
+
+      setOnline(true)
+      fireEvent(window, new Event('online'))
+
+      await waitFor(() => expect(fn).toHaveBeenCalledTimes(2)) // retried on reconnect
+      expect(screen.queryByText(/offline/i)).not.toBeInTheDocument()
+    })
   })
 
   it('does not show the submit prompt while the preview is still loading', () => {

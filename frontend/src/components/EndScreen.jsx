@@ -10,6 +10,18 @@
 // score (ties qualify; the backend resolves final ordering). This is independent
 // of personal best: PB is still tracked (localStorage) and still drives the "new
 // personal best!" flourish, but it no longer gates the submit prompt.
+//
+// Offline vs. fetch-failed (Session 21 — ROADMAP.md A6): these are now
+// distinguished via navigator.onLine. Offline is a DEAD END for submission,
+// not a fallback case — qualifies() needs a live board to compare against, so
+// offline we genuinely cannot know whether a score would rank. Queuing it
+// would mean either prompting for a name on every offline round (most of
+// which would never actually qualify) or deferring the qualification check to
+// flush time (submitting something the player was never shown as qualifying)
+// — both worse than telling the player plainly that submission isn't
+// available right now. Online-but-failed keeps the pre-existing
+// personal-best fallback: that's a transient server hiccup, not a state where
+// submission is fundamentally impossible.
 
 import { useCallback, useEffect, useState } from 'react'
 import { theme, ACTIVE_THEME } from '../constants/theme.js'
@@ -38,6 +50,7 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
   const [name, setName] = useState('')
   const [submitState, setSubmitState] = useState('idle') // idle | posting | done | error
   const [showFull, setShowFull] = useState(false)
+  const [isOffline, setIsOffline] = useState(() => !navigator.onLine)
 
   const loadPreview = useCallback(async () => {
     setStatus('loading')
@@ -53,12 +66,35 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
     loadPreview()
   }, [loadPreview])
 
+  // Track connectivity live — a round can end offline and reconnect while
+  // this screen is still showing (or vice versa). On reconnect, retry the
+  // preview fetch so a board that failed while offline can recover without
+  // requiring another round.
+  useEffect(() => {
+    const goOnline = () => {
+      setIsOffline(false)
+      loadPreview()
+    }
+    const goOffline = () => setIsOffline(true)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [loadPreview])
+
   // Qualifies for the top 10: room on the board, or score >= the last (10th) score.
   const qualifies = status === 'ready' ? qualifiesForBoard(entries, score, BOARD_SIZE) : false
-  // Show the submit prompt once we know the board. If the fetch failed we can't
-  // check, so fall back to the old personal-best rule rather than block a submit.
-  const canSubmit =
-    status === 'ready' ? qualifies : status === 'error' ? isNewPB : false
+  // Offline blocks submission outright, regardless of status or isNewPB — see
+  // the file header note. Online-but-failed keeps the personal-best fallback.
+  const canSubmit = isOffline
+    ? false
+    : status === 'ready'
+      ? qualifies
+      : status === 'error'
+        ? isNewPB
+        : false
 
   const handleSubmit = async () => {
     const trimmed = name.trim()
@@ -92,6 +128,14 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
       {isNewPB && (
         <p className="text-lg font-semibold" style={{ color: theme.accent }}>
           New personal best! 🎉
+        </p>
+      )}
+
+      {/* Offline: submission is a dead end, not a fallback case (see file
+          header note) — a clear message instead of a doomed name input/POST. */}
+      {isOffline && (
+        <p className="text-sm text-slate-400">
+          You&apos;re offline — scores can&apos;t be submitted right now.
         </p>
       )}
 
