@@ -706,3 +706,392 @@ that a mobile-tuned hitbox (O6) would amplify. Fix: combine the touch check with
 `matchMedia('(pointer: coarse)')`, and consider classifying by the input actually
 used in the round (which control path fed `inputPosRef`) rather than by device
 capability.
+
+---
+
+# Session 19 — Addendum: three additional audit areas
+
+Appended after the original 42 findings (Finding 0, B1–B14, O1–O28). Items here
+are numbered **A1–A…** so they never merge into that list. Same rules: audit
+only, nothing implemented, no data modified. Same confidence tags —
+**[code]** = confirmed by reading source, **[device]** = needs S23 FE
+verification.
+
+---
+
+## Gap 1 — Round timer and leaderboard integrity
+
+### A1. Correction to B8: the clock does **not** freeze when backgrounded — [code]
+
+The original B8 claimed backgrounding the app freezes the 60-second clock and
+called it "a free pause." **That is wrong, and the code says so plainly.** In
+[useGameLoop.js:30-31](frontend/src/hooks/useGameLoop.js#L30-L31):
+
+```js
+const dt = Math.min(elapsedMs / (1000 / 60), 3)  // capped
+const dtSeconds = elapsedMs / 1000                // NOT capped
+```
+
+Only `dt` (motion) is capped. `dtSeconds` (the timer) is raw wall-clock, and
+`App.jsx:182` decrements `timeLeftRef` by it directly. Because
+`elapsedMs = now - lastRef.current` telescopes across frames, the timer's total
+is exactly the wall-clock time since the round began. `requestAnimationFrame`
+halts while the page is hidden, so `lastRef.current` retains the pre-hide
+timestamp and the **first frame after returning carries the entire hidden
+duration in a single `dtSeconds`**.
+
+So the timer is honest wall-clock and there is **no timer exploit**. Repeated
+background/foreground cycling cannot extend a round — each cycle is billed in
+full on return.
+
+### A2. The real behavior is the opposite bug: interruptions destroy the round — [code]
+
+The same uncapped `dtSeconds` means that backgrounding for 30 s of a 60 s round
+returns the player to a game that instantly loses 30 seconds — and if the
+interruption outlasts the remaining time, `App.jsx:189` fires `endGame()` on the
+very first frame back. The player sees the End screen before they see a frame of
+gameplay.
+
+Worse, it is *asymmetric*: `dt` is capped at 3, so the world advances only three
+frames while the clock advances 30 seconds. The player is charged wall-clock time
+for a world that was frozen. This is a strictly-punishing bug, and it is far more
+severe on mobile than desktop — phones interrupt constantly (calls, notification
+shade, app switch, screen timeout), and a 60-second round has no slack.
+
+**Proposed fix:** pause on `visibilitychange → hidden` rather than trying to
+correct after the fact, which is the same fix B8 proposed for the stale-joystick
+problem. As a defensive backstop, also clamp `dtSeconds` (e.g. to 0.25 s) so that
+a single frame can never consume a meaningful fraction of the round even if the
+pause path is somehow missed. Both are client-side.
+
+### A3. Desktop is largely protected by an accident of the fullscreen pause — [code] / [device]
+
+The same uncapped `dtSeconds` exists on desktop, but desktop rarely reaches it:
+alt-tabbing out of a fullscreen window causes Chrome to exit fullscreen, which
+fires `fullscreenchange` → `handleFullscreenExit` ([App.jsx:115](frontend/src/App.jsx#L115))
+→ `pauseGame()` → `stop()`. The loop is cancelled, so no giant `dtSeconds` frame
+is ever delivered. `Escape` ([App.jsx:319-326](frontend/src/App.jsx#L319-L326))
+covers the windowed case.
+
+There is no `blur` handler, so a desktop case that switches away *without*
+leaving fullscreen (a second monitor, an OS overlay) would still hit A2. **[device]**
+On Android the equivalent question is whether an app switch exits fullscreen and
+fires `fullscreenchange` — if it does, mobile is accidentally protected too and
+A2 is narrower than it looks; if it doesn't, mobile is fully exposed. This is
+the single most valuable thing to check on the S23 FE for this gap. It is also
+exactly the concern raised in O21 about standalone mode, where fullscreen may
+not be a meaningful state at all.
+
+### A4. Live leaderboard data shows nothing anomalous — [code, read-only]
+
+Read via `GET /api/leaderboard` for all six boards. No data touched.
+
+| Board | Entries | Top score | Ceiling |
+|---|---|---|---|
+| easy / desktop | 2 | 36 | 70 |
+| easy / mobile | 10 | 52 | 70 |
+| normal / desktop | 6 | 21 | 60 |
+| normal / mobile | 6 | 26 | 60 |
+| hardcore / desktop | 1 | 4 | 50 |
+| hardcore / mobile | 4 | 14 | 50 |
+
+Nothing is at or near a per-difficulty ceiling; the highest score on any board
+(52 on easy/mobile) sits 18 below its cap. The easy/mobile board's recent run
+(28 → 39 → 41 → 43 → 52 across ~15 minutes on 2026-08-02, one player) reads as
+ordinary skill progression, not manipulation — and per A1 there is no timer
+exploit that could have produced it anyway. **No evidence of exploitation, and
+no basis for removing any entry.**
+
+One unrelated observation worth noting: **mobile boards outscore desktop boards
+in every difficulty** (easy 52 vs 36, normal 26 vs 21, hardcore 14 vs 4). That
+inverts the assumption stated in [backend/main.py](backend/main.py)'s
+`get_leaderboard` docstring — *"desktop play is harder"* — which is the stated
+justification for splitting the boards by platform. Small sample, and confounded
+by who played on what, but the premise deserves a second look. It also bears on
+**O6** (a platform-scaled hitbox for touch): the data gives no support for mobile
+needing a handicap.
+
+### A5. The score ceiling is the *only* server-side plausibility check — [code]
+
+`POST /api/leaderboard` is unauthenticated by design (public game, no
+Cloudflare Access per CLAUDE.md). The server validates name safety, theme,
+difficulty, platform, and the Session 18 per-difficulty score ceiling
+(`MAX_SCORE_BY_DIFFICULTY`, [backend/main.py](backend/main.py)) — but the score
+itself is a client-asserted integer with no relationship to a played round.
+Anyone with `curl` can post a 70 on easy/mobile, and it is indistinguishable
+from a legitimate submission. There is also no rate limit, so the boards can be
+flooded.
+
+This is worth stating plainly because it bounds how much the client-side fixes
+above are worth: **A2's fix improves fairness for honest players; it does not
+make the leaderboard tamper-proof, and nothing short of server-side round
+validation would.** For a game of this scale that trade is entirely reasonable —
+the ceiling already blocks the absurd cases, and the per-difficulty split makes a
+forged score at least internally consistent.
+
+**Proposed fix (optional, backend — out of scope this session):** a simple
+per-IP rate limit on POST, and optionally a minimum plausible round duration
+enforced by having the client send round length alongside the score. Neither is
+recommended as urgent. Recording it so the trade-off is a decision rather than
+an oversight.
+
+---
+
+## Gap 2 — Offline behavior once a real service worker exists
+
+All of the following is currently latent — it becomes live the moment a service
+worker lands (Finding 0).
+
+### A6. The offline fallback silently discards qualifying scores — [code]
+
+[EndScreen.jsx:60-61](frontend/src/components/EndScreen.jsx#L60-L61):
+
+```js
+const canSubmit = status === 'ready' ? qualifies : status === 'error' ? isNewPB : false
+```
+
+Offline today, the full path is: `getLeaderboard()` throws → `status = 'error'`
+→ `canSubmit` falls back to `isNewPB` → the name input renders → the player types
+their name and taps "Add to leaderboard" → `postScore()` throws →
+`submitState = 'error'` → *"Something went wrong. Try again"* → **the score is
+gone.** Retrying does nothing, because the network is still down, and there is no
+persistence anywhere in the component.
+
+This design is defensible today, when offline is an anomaly. It becomes wrong in
+an offline-capable PWA, where offline is a **normal operating state**: the app
+loads from cache, plays a complete round, and then invites the player to enter
+their name for a submission it already knows cannot succeed. That is the worst of
+the three possible behaviors — it costs the player effort *and* loses the score.
+
+**Proposed fix:** distinguish "the fetch failed" from "we are offline" using
+`navigator.onLine` plus the `online`/`offline` events. Then:
+
+- **Offline + score would plausibly qualify** → queue it. Persist
+  `{name, score, theme, difficulty, platform, playedAt}` to `localStorage` (or
+  IndexedDB) and show *"Saved — will be added when you're back online"*. Flush on
+  the next `online` event or next app start, ideally via a Background Sync
+  registration with a plain event-listener fallback (Background Sync is
+  Chromium-only, which is fine for the S23 FE target).
+- **Offline + can't tell whether it qualifies** → still queue. The server is the
+  authority on ordering anyway; a queued score that turns out not to rank is
+  harmless.
+- **Online but the fetch failed** → keep today's `isNewPB` fallback. That is a
+  genuine transient error and "try again" is the right advice.
+
+Two consequences to design around, both real: a queued score submitted days later
+gets a server-side `created_at` of the flush time, which changes tie-break
+ordering (`ORDER BY score DESC, created_at ASC` in `fetch_top`) — worth sending
+the client's `playedAt` if that matters. And a queue is a tampering surface, so
+it should stay subject to the same per-difficulty ceiling on flush (it already
+is, server-side).
+
+### A7. Confirming your caching prior — with one narrow amendment — [code]
+
+**Your prior is right, and for a sharper reason than "stale standings are
+misleading."** A stale cached `/api/leaderboard` would corrupt the *qualification
+logic*, not just the display. `qualifies()`
+([Leaderboard.jsx:40-42](frontend/src/components/Leaderboard.jsx#L40-L42))
+compares the score against `entries[entries.length - 1].score` — the 10th-place
+cutoff. Feed it a stale board and it fails in both directions: it offers the
+submit prompt for a score that no longer qualifies (player submits, never
+appears, looks broken), or it hides the prompt for a score that does qualify
+(player silently loses a legitimate placement). A stale *display* is a cosmetic
+annoyance; a stale *cutoff* is a correctness bug. **Do not runtime-cache the
+qualification fetch. Network-only.**
+
+The one amendment: the same endpoint serves two different purposes. The End
+screen's fetch feeds `qualifies()` and must be network-only. But
+`LeaderboardOverlay` ([Leaderboard.jsx:76](frontend/src/components/Leaderboard.jsx#L76))
+is pure display — browsing standings from the start screen. There, showing a
+cached board **explicitly labelled** *"Last updated 2 hours ago — offline"* is
+strictly better than "Couldn't load scores," and it makes the offline PWA feel
+finished rather than broken. If you take this, it must be an opt-in
+stale-while-revalidate on the display path only, never on the End screen's
+`loadPreview`. If that split feels like more machinery than it's worth,
+network-only everywhere is a perfectly good answer — the amendment is optional
+and your instinct is the safe default.
+
+Recommended routing overall:
+
+| Route | Strategy | Why |
+|---|---|---|
+| `/index.html` | **Network-first**, cache fallback | See A8 — cache-first here strands users on an old build |
+| `/assets/*.js`, `*.css` | Cache-first, precache | Content-hashed by Vite; immutable, safe forever |
+| `/audio/*.mp3` | Cache-first, precache — see A9 | Static, small, never change |
+| `/favicon.ico`, `/icon-*.png` | Cache-first, precache | Static |
+| `/api/leaderboard` (End screen) | **Network-only** | Feeds `qualifies()` — staleness is a correctness bug |
+| `/api/leaderboard` (overlay) | Network-only, or labelled SWR (A7) | Display only |
+| `/api/health` | **Never cache** | A cached 200 makes a dead backend look alive |
+
+### A8. `index.html` cache strategy is the deploy-breaking decision — [code]
+
+The Pi deploy is `npm run build` + `systemctl restart hunter` (CLAUDE.md). Vite
+content-hashes `/assets/*` (the live build serves `index-z6yPhDhW.js`), so those
+are safe to cache forever — but **`index.html` keeps the same URL across every
+deploy** and is the only thing pointing at the new hashes. A cache-first
+`index.html` would pin every installed user to whatever build they first
+installed, permanently, with no way to update short of clearing site data. The
+game would appear to stop receiving updates.
+
+**Proposed fix:** network-first for `index.html` with a short timeout falling
+back to cache, plus a versioned precache name and `skipWaiting()` +
+`clients.claim()` so a new worker takes over promptly. Worth pairing with a
+visible "Update available — tap to reload" affordance, since a mid-round
+`skipWaiting` reload would be hostile.
+
+### A9. Audio files are small enough to precache, with one Range-request caveat — [code] / [device]
+
+Total audio is **184 KB** (`Ambient_Loop.mp3` 120 KB, `Game_Over.mp3` 25 KB,
+`Congrats.mp3` 17 KB, `Bubble_Pop.mp3` 9 KB), against **204 KB** for the entire
+JS/CSS bundle and 24 KB of icons. The complete precache is **~410 KB** — trivial.
+Precache all four; there is no case for lazy-loading anything at this size, and
+the ambient loop starting instantly offline is most of the "feels installed"
+effect.
+
+The caveat is the classic service-worker media gotcha: browsers often request
+media with a `Range` header, and a naive `caches.match()` returns a full `200`
+response to a request expecting `206 Partial Content`, which some browsers reject
+outright. It bites Safari hardest and Chrome least, and these files are small
+enough that Chrome will usually fetch them whole — but the failure mode is
+*silent audio in the installed app only*, which is miserable to debug after the
+fact. **[device]** Explicitly test all four sounds in the installed PWA with the
+network disabled once a worker lands. If it does misbehave, the standard fix is a
+Range-aware fetch handler that slices the cached `ArrayBuffer` and synthesizes a
+`206`.
+
+Second, smaller interaction: `useSound.js` constructs `new Audio(src)` per
+one-shot (noted in **O18**). Each construction issues a request that the service
+worker must handle — dozens per round at a high score. Cache hits are fast, but
+this makes O18's buffer-pool fix more worthwhile once a worker is in play, not
+less.
+
+### A10. Offline state is invisible to the player — [code]
+
+Nothing in the codebase reads `navigator.onLine` or listens for `online`/`offline`
+(confirmed by search). Today that's acceptable — offline means "the page didn't
+load." In an installed PWA the app launches fine and the player only discovers
+they're offline when the leaderboard shows *"Couldn't load scores"*
+([Leaderboard.jsx:48](frontend/src/components/Leaderboard.jsx#L48)), an error
+message that describes a server problem rather than their own connectivity.
+
+**Proposed fix:** a small persistent offline indicator on the start screen, and
+connectivity-aware copy on the leaderboard ("You're offline" vs "Couldn't load
+scores"). Pairs directly with A6's queued-submission messaging.
+
+---
+
+## Gap 3 — Test suite impact
+
+Current state: **21 files, 189 frontend tests, all passing** (verified by running
+the suite), plus 40 backend tests = the 229 from Session 18.
+
+### A11. Tests that would break loudly (good — they're doing their job)
+
+These fail immediately on the corresponding fix, which is the desired outcome:
+
+| Fix | Test that breaks | Why |
+|---|---|---|
+| **B9** raise `JOYSTICK_MARGIN` 40 → ~72 | `useInput.test.js` — *"grabs the stick when a touch lands within the activation zone"*, *"ignores a touch that lands outside…"*, *"clamps displacement to JOYSTICK_RADIUS…"* | All three compute expected coords from `JOYSTICK_BASE_X/Y`. They import the constants rather than hardcoding, so they may **silently keep passing** — see A13. |
+| **B11** add `orientation.unlock()` | `useFullscreen.test.js` — *"calls exitFullscreen only when currently fullscreen"*, *"does not call exitFullscreen when not currently fullscreen"* | New call inside `exit()`; the stub has no `unlock`, so it throws unless mocked. |
+| **B10** re-evaluate orientation on change | `RotationToast.test.jsx` — *"never mounts in landscape"* | The component would now subscribe and could mount later; the assertion becomes timing-dependent. |
+| **O5** joystick dead zone + response curve | `useInput.test.js` — *"clamps displacement to JOYSTICK_RADIUS and normalizes to [-1,1]"*; `predator.test.js` — *"joystick mode: velocity is proportional to stick displacement"* | Both assert a strictly linear map. A curve breaks the proportionality assertion by design. |
+| **O6** platform-scaled hitbox | `predator.test.js` — *"catches a fish within HITBOX_RADIUS"*, *"does not catch a fish outside HITBOX_RADIUS"* | `resolveCatches` becomes platform-dependent; needs a platform argument or injected radius. |
+| **O11** in-place mutation in hot loops | `predator.test.js` *"returns a new object and does not mutate the input"*; `particles.test.js` *"…returning a new array"*; `boids.test.js` (several purity assertions) | These assert non-mutation **explicitly**. Correct approach: keep the pure functions and their tests untouched, add separate `*InPlace` variants with their own tests — do **not** relax the existing purity tests. |
+| **O15** throttle minimap | No direct test today (`renderer.test.js` has only 3 tests, none on `drawMinimap`) | Would need a new one. |
+| **B14** defer `sizeCanvas` after `enter()` | No `App.jsx` integration test exists | Untested surface — see A14. |
+
+### A12. Fixes needing entirely new tests
+
+| Fix | What the new test should assert |
+|---|---|
+| **B1 / B4 / B5 / B6 / O24** compact layout + scroll | Given `innerHeight = 393`, `EndScreen` renders its compact variant, the Play Again button is in the document, and the container carries `overflow-y-auto`. Mirror `StartScreen.test.jsx`'s existing *"uses the compact layout when viewport height is under 500px"* and *"responds to a resize crossing the compact threshold"* — that pattern already works and should be the template for all five screens. Note jsdom has no layout, so **a test cannot detect actual clipping** — it can only assert the compact class/branch was chosen. Real clipping stays a device check. |
+| **`useCompactViewport()` hook (O24)** | Threshold boundary (499/500/501), resize response, orientationchange response, listener cleanup on unmount. |
+| **A2 / B8** visibility pause | `document.visibilityState = 'hidden'` + dispatch `visibilitychange` during play → `stop()` called, `inputPosRef` zeroed, `touchIdRef` cleared. |
+| **A2** `dtSeconds` clamp | A 5-second frame gap yields a `dtSeconds` no greater than the clamp. **This is the assertion that does not exist today** — see A13. |
+| **A6** offline submit queue | Offline + qualifying score → entry persisted, confirmation copy shown, no POST attempted; on `online` → exactly one POST per queued entry, queue cleared; a failed flush leaves the queue intact. |
+| **A7** SW routing | If a worker lands: `/api/leaderboard` is never served from cache; `index.html` is network-first; asset requests hit the precache. Needs a SW test harness — see A14. |
+| **O4** joystick rendering | `onFrameDraw` invokes the joystick draw only when `joystickRef.current.active`. |
+| **O8** DPR clamp | `devicePixelRatio = 3` → canvas backing store is sized at 2×, not 3×. |
+| **O10** frame cap | Two rAF fires 8 ms apart produce exactly one `update`/`draw` pair when the cap is on. |
+| **B3** safe-area padding | Assert the `env(safe-area-inset-*)` styles are applied; jsdom won't compute them, so this is a "the class/style is present" test, not a geometry test. |
+
+### A13. ⚠ Tests that would keep passing while asserting now-wrong behavior
+
+**This is the dangerous category. Four cases, in descending severity.**
+
+**1. `useGameLoop.test.js` — *"caps dt at 3 after a long stall"* — already
+half-blind, today.** The test fires a 5-second frame gap and asserts only:
+
+```js
+const [dt] = update.mock.calls[1]
+expect(dt).toBe(3)
+```
+
+It destructures **only `dt`**. The second argument — `dtSeconds = 5.0`, the value
+that causes A2's entire round-destroying behavior — is delivered to `update()` and
+**never asserted by any test in the suite**. The test's name says
+"spiral-of-death guard" and its passing green tick implies long stalls are
+handled, while the exact scenario it constructs is the one that silently eats 5
+seconds off the round clock. If A2's clamp is added, **this test still passes
+unchanged** — it would not verify the fix, and it would not have caught the bug.
+Any work on A2 must start by extending this test to assert `dtSeconds`.
+
+**2. `useInput.test.js` joystick geometry — passes through a `JOYSTICK_MARGIN`
+change without noticing.** All three activation-zone tests import
+`JOYSTICK_BASE_X`/`JOYSTICK_BASE_Y` and compute expectations from them, so
+raising the margin (B9) moves both the code and the expectations together and the
+suite stays green. That's correct behavior for a *tuning* change — but it means
+the tests provide **zero** protection for the property B9 actually cares about:
+that the activation circle clears the Android gesture strips. A test asserting
+`JOYSTICK_BASE_X - JOYSTICK_ACTIVATE_RADIUS >= SAFE_EDGE_MARGIN` would encode the
+real invariant; nothing like it exists.
+
+**3. `EndScreen.test.jsx` — *"falls back to the personal-best rule when the
+preview fetch fails."*** This test pins the exact behavior A6 argues is wrong
+offline. It mocks a rejected fetch and asserts the submit prompt appears. After
+A6, that same input should produce a *queued* submission with different copy —
+but if A6 is implemented by adding an offline branch *before* the error branch,
+this test's mock (a plain rejection with `navigator.onLine` still true) takes the
+unchanged path and **passes while no longer describing what happens to a real
+offline player**. It would need an explicit `navigator.onLine = false` sibling
+test to stay meaningful.
+
+**4. `Leaderboard.test.jsx` `qualifies()` unit tests (4 tests).** These are pure
+and correct and will pass forever. But they test the function in isolation, and
+A7's whole point is that `qualifies()` is only as good as the freshness of the
+entries handed to it. If a cached board is ever wired into `loadPreview`, all
+four tests stay green while the qualification logic silently produces wrong
+answers in production. The gap is that nothing asserts *provenance* — that the
+End screen's entries came from the network.
+
+Lower-severity same-shape cases worth noting: `platform.test.js` (4 tests) pins
+`maxTouchPoints > 0` and would keep passing through **O28**'s `pointer: coarse`
+refinement if the refinement is added as an additional condition; and
+`renderer.test.js` (3 tests) asserts nothing about `shadowBlur`, so **O9**'s glow
+rewrite could change rendering cost or appearance with the suite fully green.
+
+### A14. Currently untestable in the Vitest/jsdom setup
+
+The setup is minimal — [vitest.config.js](frontend/vitest.config.js) is jsdom +
+globals, and [src/test/setup.js](frontend/src/test/setup.js) is a single
+`jest-dom` import. Everything below needs new infrastructure:
+
+| Capability | Status | What's needed |
+|---|---|---|
+| `visualViewport` (**B7**) | **Absent in jsdom.** No polyfill, no stub. | A stub object with `height`/`width`/`offsetTop` and a dispatchable `resize`. Note jsdom can't simulate a keyboard at all — the test can only verify the listener wiring reacts correctly, never that the input is actually visible. |
+| `document.visibilityState` (**A2/B8**) | Partially available — `AttractBackground.test.jsx` already does this successfully (*"pauses on visibilitychange (hidden) and resumes when visible again"*). | Reusable. Extract that file's approach into a shared helper rather than reimplementing. **This is the one hard case that's already solved.** |
+| `screen.orientation` (**B10/B11**) | `useFullscreen.test.js` hand-stubs `window.screen.orientation` per test. | Extend the stub with `unlock` and an `orientationchange` dispatcher; promote it into `setup.js` so `RotationToast` can share it. |
+| `devicePixelRatio` variation (**O8**) | Writable on jsdom's `window`, so mechanically easy. | No infra needed, but the canvas mock must record the `width`/`height` actually assigned — `renderer.test.js` already uses a context spy that could be extended. |
+| Service worker registration (**A7/A8**) | **Fully absent.** No `navigator.serviceWorker`, no `Cache`, no `CacheStorage`, no `FetchEvent` in jsdom. | The largest new dependency. Options: `service-worker-mock` for unit-testing the fetch handler in isolation, or accept that SW routing is verified by real-device/Lighthouse checks only. Recommend the latter to start — mocking a whole SW environment to test a routing table is poor value. |
+| `navigator.onLine` + `online`/`offline` events (**A6/A10**) | `navigator.onLine` is defined but not writable directly. | `Object.defineProperty` override plus `window.dispatchEvent(new Event('offline'))`. Straightforward; belongs in `setup.js`. |
+| Background Sync (**A6**) | Absent. | Not worth mocking — test the queue's persistence and flush logic directly against `localStorage`, and treat the Sync registration as a thin untested wrapper. |
+| Real layout / clipping (**B1/B4/B5**) | **Structurally impossible.** jsdom has no layout engine; `offsetHeight` is 0 and `getBoundingClientRect` returns zeros — which is exactly why `useInput.test.js` stubs it (documented in its header as "audit decision D7"). | No fix. Tests can assert *which layout branch was chosen*, never that content fits. **Verifying B1 is actually fixed requires the S23 FE, or Playwright against a real browser at a 851×393 viewport.** Worth considering a small Playwright layer for the mobile-layout fixes specifically — the `window.__hunter` dev hook already exists for exactly this purpose. |
+
+### A15. Suggested sequencing
+
+Independent of priority (yours to set), one ordering constraint is worth
+recording: **A13's four blind-spot tests should be tightened *before* the
+corresponding fixes land**, not after. Extending
+`useGameLoop.test.js` to assert `dtSeconds` while it still fails is what turns
+A2 from "a change we believe is right" into "a change we can prove works." Fixing
+first and testing after produces a green suite that never demonstrated the bug.
