@@ -78,6 +78,16 @@ export default function App() {
     localStorage.setItem(DIFFICULTY_KEY, d)
   }, [])
   const fleeSettingsRef = useRef(DIFFICULTY_SETTINGS[DEFAULT_DIFFICULTY])
+  // Round's difficulty, locked at game start — same reasoning as
+  // fleeSettingsRef, and required for the same structural reason (Session 22
+  // Bug 1): onFrameUpdate is memoized once for the component's whole
+  // lifetime (movePredator/tickBoids never change identity), so endGame —
+  // called from inside it — closes over whichever `difficulty` existed on
+  // the FIRST render, forever. Reading difficultyRef.current instead (set
+  // fresh in startGame, which DOES track live difficulty via its own deps)
+  // avoids that stale-closure read entirely, rather than trying to widen
+  // onFrameUpdate's deps and fight its memoization.
+  const difficultyRef = useRef(difficulty)
   // Glow on fleeing fish is permanent (Session 15 removed the toggle) — the
   // renderer applies it unconditionally, so there's no glow state here.
 
@@ -238,6 +248,9 @@ export default function App() {
     // Lock the difficulty's fish-flee settings for this game (selector is
     // start-screen only). Shark speed is constant (SHARK_SPEED) in all modes.
     fleeSettingsRef.current = DIFFICULTY_SETTINGS[difficulty]
+    // Lock the difficulty itself too — endGame() reads this ref rather than
+    // the live `difficulty` state (Bug 1 — see difficultyRef's declaration).
+    difficultyRef.current = difficulty
 
     await enter() // fullscreen + landscape lock (best effort)
 
@@ -303,7 +316,11 @@ export default function App() {
     // Per-difficulty PB — modes are incomparable, so each has its own key. The
     // old global hunter_pb is retired (never read or written). Default 0, so a
     // score only counts as a new PB when it beats the matching difficulty's best.
-    const pbKey = `hunter_pb_${difficulty}`
+    // Reads difficultyRef, NOT the live `difficulty` state — see its
+    // declaration for why (Session 22 Bug 1: endGame is called from a
+    // permanently-memoized closure that would otherwise freeze `difficulty`
+    // at whatever it was on App's first render).
+    const pbKey = `hunter_pb_${difficultyRef.current}`
     const currentPB = parseInt(localStorage.getItem(pbKey) || '0', 10)
     const score = scoreRef.current
     const isNewPB = isNewPersonalBest(score, currentPB)

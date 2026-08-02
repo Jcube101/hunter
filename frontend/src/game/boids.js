@@ -182,7 +182,22 @@ export function updateFish(
   vx = clamped.x
   vy = clamped.y
 
-  return { x: fish.x + vx * dt, y: fish.y + vy * dt, vx, vy }
+  let nx = fish.x + vx * dt
+  let ny = fish.y + vy * dt
+
+  // Hard positional clamp (Session 22 Bug 3) — a fish can never physically
+  // leave the world, regardless of accumulated velocity or whether
+  // edgeRepulsion's force balance holds. This is a backstop, not the
+  // primary mechanism: edgeRepulsion is tuned (see constants/boids.js) to
+  // turn a fish around before it reaches this, so it should trigger rarely.
+  // Mirrors predator.js's stepPredator — zero the velocity component that
+  // hit the wall so the fish doesn't keep pushing into the clamp every
+  // frame; edgeRepulsion (nonzero right at x=0/y=0) then eases it back in
+  // next frame instead of it visibly bouncing.
+  if (nx < 0) { nx = 0; vx = 0 } else if (nx > world.width) { nx = world.width; vx = 0 }
+  if (ny < 0) { ny = 0; vy = 0 } else if (ny > world.height) { ny = world.height; vy = 0 }
+
+  return { x: nx, y: ny, vx, vy }
 }
 
 // Advance the whole school one tick. Returns a NEW array (no mutation), so the

@@ -240,7 +240,7 @@ Each fish looks at neighbors within a defined radius and computes four forces:
 | Alignment | Match heading of neighbors | 60px | 1.0 |
 | Cohesion | Drift toward group center | 80px | 1.0 |
 | Flee | Escape predator | 120px | 3.0 |
-| Edge repulsion | Turn away from world boundary | 80px | 2.0 |
+| Edge repulsion | Turn away from world boundary | 140px | 6.0 |
 
 **Flee weight (3.0) deliberately dominates all flocking forces** when the
 predator is within range. This makes the school scatter convincingly on direct
@@ -545,8 +545,8 @@ brief reason (see CONTRIBUTING.md "Tuning Discipline").
 | `COHESION_RADIUS` | 100 | px — wider cohesion pull (from 80) |
 | `COHESION_WEIGHT` | 1.1 | Reduced post-playtest — school was too tight, easy to herd once learned |
 | `ANCHOR_WEIGHT` | 0.02 | Weak center-pull — lowered from 0.05 (too strong, school clumped unnaturally) |
-| `EDGE_REPULSION_RADIUS` | 120 | px from world boundary — raised from 80 so fish turn earlier, stay central |
-| `EDGE_REPULSION_WEIGHT` | 3.0 | Raised from 2.0 to compensate for weaker anchor — fish avoid walls more aggressively | |
+| `EDGE_REPULSION_RADIUS` | 140 | px from world boundary — raised from 120 (Session 22 tune: fish, 120/3.0, could be pushed off-screen by sustained Hardcore flee pressure at a corner — see ROADMAP.md Session 22) |
+| `EDGE_REPULSION_WEIGHT` | 6.0 | Raised from 3.0 — must exceed the worst-case FLEE_WEIGHT (4.0, Hardcore) with real margin, since flee is a constant-strength force while edge repulsion only ramps up near the wall; a hard positional clamp in updateFish() also backstops this regardless of tuning | |
 | `HITBOX_RADIUS` | 12 | px — fish catch detection (raised from 8: prevents single-frame tunnelling past a fish at high closing speed) |
 | `SHARK_OFFSET_MOBILE` | 80 | px above touch point |
 | `WORLD_WIDTH_MULTIPLIER` | 1.3 | × viewport width (reduced 2.5 → 1.6 → 1.3 — less off-screen territory for fish to flee into) |

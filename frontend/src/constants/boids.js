@@ -52,8 +52,19 @@ export const COHESION_WEIGHT = 1.1 // reduced from 1.4 — school was too tight,
 export const ANCHOR_WEIGHT = 0.02 // very subtle — was 0.05, too strong (school clumped)
 
 // --- Edge repulsion (turn away from world boundary) ---
-export const EDGE_REPULSION_RADIUS = 120 // px from world boundary — start turning earlier
-export const EDGE_REPULSION_WEIGHT = 3.0 // avoid walls aggressively (compensates weaker anchor)
+// Session 22 (Bug 3): fish could be pushed off-screen under sustained flee
+// pressure at a wall/corner, worst on Hardcore. Flee is a CONSTANT-strength
+// force within FLEE_RADIUS (doesn't ramp with distance), while edge
+// repulsion ramps linearly from 0 (at EDGE_REPULSION_RADIUS) up to
+// EDGE_REPULSION_WEIGHT (at the wall) — so it can only reliably turn a fish
+// around before it reaches the wall if EDGE_REPULSION_WEIGHT exceeds the
+// worst-case FLEE_WEIGHT (4.0, Hardcore) with real margin for inertia and
+// the smaller flocking forces. 3.0/120 did not (verified by simulation —
+// see ROADMAP.md Session 22); 6.0/140 holds with margin to spare in both a
+// straight-wall and a cornered worst case. A hard positional clamp in
+// updateFish() backstops this regardless of tuning correctness.
+export const EDGE_REPULSION_RADIUS = 140 // px from world boundary — start turning earlier
+export const EDGE_REPULSION_WEIGHT = 6.0 // avoid walls aggressively (compensates weaker anchor)
 
 // --- Catch detection ---
 // Coordinates are all CSS-pixel world space (no DPR factor anywhere in the

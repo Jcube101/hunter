@@ -143,6 +143,78 @@ describe('EndScreen submit-qualification wiring', () => {
       await waitFor(() => expect(fn).toHaveBeenCalledTimes(2)) // retried on reconnect
       expect(screen.queryByText(/offline/i)).not.toBeInTheDocument()
     })
+
+    // Session 22 Bug 2. A fetch made while genuinely offline can stay pending
+    // for a long time before the browser actually rejects it — it isn't an
+    // instant failure. If the player reconnects before that rejection
+    // arrives, loadPreview() runs again and can succeed FIRST; the original
+    // request's rejection then lands AFTER, and without a staleness guard it
+    // would flip status back to 'error' right after it was correctly set to
+    // 'ready'. That reproduces exactly what was observed: "Couldn't load
+    // scores" persisting despite Full Leaderboard (a fresh fetch) working
+    // fine — the network was healthy the whole time.
+    it('a stale offline rejection arriving AFTER a successful reconnect fetch does not clobber the loaded board', async () => {
+      setDesktop()
+      setOnline(false)
+
+      let rejectFirst
+      let resolveSecond
+      const firstCall = new Promise((_, reject) => {
+        rejectFirst = reject
+      })
+      const secondCall = new Promise((resolve) => {
+        resolveSecond = resolve
+      })
+      const responses = [firstCall, secondCall]
+      const fn = vi.fn(() => responses.shift())
+      vi.stubGlobal('fetch', fn)
+
+      render(
+        <EndScreen score={5} personalBest={0} isNewPB={false} onPlayAgain={() => {}} onMenu={() => {}} difficulty="easy" />,
+      )
+      await screen.findByText(/offline/i)
+      expect(fn).toHaveBeenCalledTimes(1)
+
+      setOnline(true)
+      fireEvent(window, new Event('online'))
+      await waitFor(() => expect(fn).toHaveBeenCalledTimes(2))
+
+      // The reconnect fetch succeeds first...
+      resolveSecond({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([{ id: 1, name: 'Alice', score: 3 }]),
+      })
+      await waitFor(() => expect(screen.getByText('Alice')).toBeInTheDocument())
+
+      // ...then the original offline request finally rejects, late.
+      rejectFirst(new Error('offline (delayed)'))
+      await new Promise((r) => setTimeout(r, 0)) // let the rejection's microtask settle
+
+      expect(screen.queryByText(/couldn.t load scores/i)).not.toBeInTheDocument()
+      expect(screen.getByText('Alice')).toBeInTheDocument()
+    })
+
+    it('the submit prompt appears once the board reloads after reconnect, if the score qualifies', async () => {
+      setDesktop()
+      setOnline(false)
+      const fn = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve([]) }) // empty board -> room to qualify
+      vi.stubGlobal('fetch', fn)
+
+      render(
+        <EndScreen score={5} personalBest={0} isNewPB={false} onPlayAgain={() => {}} onMenu={() => {}} difficulty="easy" />,
+      )
+      await screen.findByText(/offline/i)
+      expect(screen.queryByPlaceholderText('Your name')).not.toBeInTheDocument()
+
+      setOnline(true)
+      fireEvent(window, new Event('online'))
+
+      expect(await screen.findByPlaceholderText('Your name')).toBeInTheDocument()
+    })
   })
 
   it('does not show the submit prompt while the preview is still loading', () => {

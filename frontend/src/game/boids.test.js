@@ -16,7 +16,14 @@ import {
   updateSchool,
   initFish,
 } from './boids.js'
-import { FISH_BASE_SPEED, FISH_FLEE_SPEED, INITIAL_VELOCITY_RANGE } from '../constants/boids.js'
+import {
+  FISH_BASE_SPEED,
+  FISH_FLEE_SPEED,
+  INITIAL_VELOCITY_RANGE,
+  EDGE_REPULSION_RADIUS,
+  EDGE_REPULSION_WEIGHT,
+  DIFFICULTY_SETTINGS,
+} from '../constants/boids.js'
 
 describe('separation', () => {
   it('steers away from a single close neighbor', () => {
@@ -253,6 +260,126 @@ describe('updateFish', () => {
     const speedEasy = Math.hypot(withEasyRadius.vx, withEasyRadius.vy)
     expect(speedDefault).toBeGreaterThan(speedEasy)
     expect(speedEasy).toBeCloseTo(0, 5) // no forces at all triggered, held still
+  })
+})
+
+// Session 22 Bug 3: fish were observed escaping world bounds on-device under
+// sustained flee-vs-wall pressure (predator cornering a fish against an
+// edge). Two-layer fix: retune edgeRepulsion so it actually wins that fight
+// (see constants/boids.js), plus a hard positional clamp in updateFish as a
+// backstop that holds regardless of tuning. These tests cover both layers.
+describe('updateFish — world-bounds clamp (Session 22 Bug 3)', () => {
+  const world = { width: 200, height: 200 }
+
+  // A huge INCOMING vx/vy doesn't itself threaten the wall — clampMagnitude
+  // already caps speed to maxSpeedFor() (at most FISH_FLEE_SPEED) before the
+  // position update ever sees it, regardless of how large the summed forces
+  // were. What the hard clamp actually guards against is a large `dt`
+  // (frame-rate stall) turning even a normal, already-speed-capped velocity
+  // into a big single-frame position jump — the real game loop caps dt at 3,
+  // but this clamp holds unconditionally, independent of that cap.
+  it('clamps position to the left/top edge and zeros the offending velocity component under a frame-rate stall', () => {
+    const fish = { x: 5, y: 5, vx: -9999, vy: -9999 } // speed-clamped before the position step
+    const result = updateFish(fish, [fish], null, world, 100) // large dt — stall
+    expect(result.x).toBe(0)
+    expect(result.y).toBe(0)
+    expect(result.vx).toBe(0)
+    expect(result.vy).toBe(0)
+  })
+
+  it('clamps position to the right/bottom edge and zeros the offending velocity component under a frame-rate stall', () => {
+    const fish = { x: 195, y: 195, vx: 9999, vy: 9999 }
+    const result = updateFish(fish, [fish], null, world, 100)
+    expect(result.x).toBe(world.width)
+    expect(result.y).toBe(world.height)
+    expect(result.vx).toBe(0)
+    expect(result.vy).toBe(0)
+  })
+
+  it('holds even with dt beyond the real game loop\'s cap of 3, proving it does not depend on that cap', () => {
+    const fish = { x: 5, y: 100, vx: -9999, vy: 0 }
+    const result = updateFish(fish, [fish], null, world, 10)
+    expect(result.x).toBe(0)
+  })
+
+  it('corrects a fish that is already out of bounds (e.g. from a future spawn/tuning bug), not just one approaching the edge', () => {
+    const fish = { x: -500, y: -500, vx: 0, vy: 0 }
+    const result = updateFish(fish, [fish], null, world, 1)
+    expect(result.x).toBe(0)
+    expect(result.y).toBe(0)
+  })
+
+  it('does not clamp a fish that is legitimately in bounds and moving normally', () => {
+    const fish = { x: 100, y: 100, vx: 1, vy: 0 }
+    const result = updateFish(fish, [fish], null, world, 1)
+    expect(result.x).toBeGreaterThan(0)
+    expect(result.x).toBeLessThan(world.width)
+  })
+})
+
+// Tuning invariant, not a specific-value check: this encodes the actual
+// property that caused Bug 3, so a future retune that reintroduces the
+// imbalance fails a fast unit test instead of only surfacing on a real
+// device. Flee is a constant-strength force within its radius (doesn't ramp
+// down near a wall), so edgeRepulsion — which ramps from 0 up to
+// EDGE_REPULSION_WEIGHT — can only turn a fish around before it reaches the
+// wall if its peak exceeds the worst-case FLEE_WEIGHT across all
+// difficulties, with margin for inertia and the smaller flocking forces.
+describe('edge repulsion tuning invariant (Session 22 Bug 3)', () => {
+  it('EDGE_REPULSION_WEIGHT exceeds the worst-case difficulty FLEE_WEIGHT with margin', () => {
+    const worstCaseFleeWeight = Math.max(
+      ...Object.values(DIFFICULTY_SETTINGS).map((d) => d.FLEE_WEIGHT),
+    )
+    expect(EDGE_REPULSION_WEIGHT).toBeGreaterThan(worstCaseFleeWeight * 1.25)
+  })
+})
+
+// Integration-style: simulate sustained worst-case pressure across many real
+// ticks (updateFish, not a re-derivation of it) and confirm the fish never
+// leaves world bounds — proving the RETUNED FORCE BALANCE holds in practice,
+// not just that the hard clamp catches a violation after the fact. The
+// predator repositions every tick to stay just inside fleeRadius on the far
+// side, so flee never lets up — the same worst case used to find the new
+// tuning values (see constants/boids.js comment).
+describe('sustained flee-vs-wall pressure (Session 22 Bug 3, integration)', () => {
+  const world = { width: 1000, height: 1000 }
+
+  it('a fish pinned against a wall by constant Hardcore-strength flee pressure stays in bounds', () => {
+    const { FLEE_WEIGHT, FLEE_RADIUS } = DIFFICULTY_SETTINGS.hardcore
+    let fish = { x: 50, y: 500, vx: 0, vy: 0 }
+    for (let i = 0; i < 300; i++) {
+      const predator = { x: fish.x + (FLEE_RADIUS - 1), y: 500 }
+      fish = updateFish(fish, [fish], predator, world, 1, FLEE_WEIGHT, FLEE_RADIUS)
+      expect(fish.x).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('a fish pinned in a corner by constant Hardcore-strength flee pressure stays in bounds on both axes', () => {
+    const { FLEE_WEIGHT, FLEE_RADIUS } = DIFFICULTY_SETTINGS.hardcore
+    let fish = { x: 50, y: 50, vx: 0, vy: 0 }
+    for (let i = 0; i < 300; i++) {
+      const dist = FLEE_RADIUS - 1
+      const norm = Math.SQRT1_2 // diagonal unit vector
+      const predator = { x: fish.x + dist * norm, y: fish.y + dist * norm }
+      fish = updateFish(fish, [fish], predator, world, 1, FLEE_WEIGHT, FLEE_RADIUS)
+      expect(fish.x).toBeGreaterThanOrEqual(0)
+      expect(fish.y).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('the fish is turned around by edgeRepulsion well before the hard clamp is needed (tuning holds, not just the backstop)', () => {
+    const { FLEE_WEIGHT, FLEE_RADIUS } = DIFFICULTY_SETTINGS.hardcore
+    let fish = { x: 50, y: 500, vx: 0, vy: 0 }
+    let minX = fish.x
+    for (let i = 0; i < 300; i++) {
+      const predator = { x: fish.x + (FLEE_RADIUS - 1), y: 500 }
+      fish = updateFish(fish, [fish], predator, world, 1, FLEE_WEIGHT, FLEE_RADIUS)
+      minX = Math.min(minX, fish.x)
+    }
+    // A generous buffer above 0 — if this creeps down toward the wall on a
+    // future retune, the balance is eroding even though the hard clamp
+    // would still technically prevent an escape.
+    expect(minX).toBeGreaterThan(EDGE_REPULSION_RADIUS * 0.25)
   })
 })
 

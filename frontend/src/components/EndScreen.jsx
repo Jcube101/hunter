@@ -23,7 +23,7 @@
 // personal-best fallback: that's a transient server hiccup, not a state where
 // submission is fundamentally impossible.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { theme, ACTIVE_THEME } from '../constants/theme.js'
 import { getPlatform } from '../utils/platform.js'
 import {
@@ -51,13 +51,28 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
   const [submitState, setSubmitState] = useState('idle') // idle | posting | done | error
   const [showFull, setShowFull] = useState(false)
   const [isOffline, setIsOffline] = useState(() => !navigator.onLine)
+  // Guards against a stale in-flight request clobbering a newer one (Session
+  // 22 Bug 2). A round ending offline starts a fetch that can stay pending
+  // for a long time before it actually rejects (real network timeouts, not
+  // an instant failure). If the player reconnects before that rejection
+  // arrives, loadPreview() is called again and can succeed FIRST — but the
+  // original, now-stale request's rejection still lands afterward and (with
+  // nothing guarding it) would flip status back to 'error' right after it
+  // was correctly set to 'ready', which read as "Couldn't load scores"
+  // persisting despite a healthy reconnect. Each call captures a fresh id;
+  // a request only applies its result if it's still the most recent one.
+  const previewRequestIdRef = useRef(0)
 
   const loadPreview = useCallback(async () => {
+    const requestId = ++previewRequestIdRef.current
     setStatus('loading')
     try {
-      setEntries(await getLeaderboard(difficulty, myPlatform))
+      const data = await getLeaderboard(difficulty, myPlatform)
+      if (previewRequestIdRef.current !== requestId) return // superseded — ignore
+      setEntries(data)
       setStatus('ready')
     } catch {
+      if (previewRequestIdRef.current !== requestId) return // superseded — ignore
       setStatus('error')
     }
   }, [difficulty, myPlatform])
