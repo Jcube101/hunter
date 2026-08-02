@@ -184,7 +184,10 @@ Detected via window.innerHeight on mount and on resize/orientation change.
 ## World Design
 
 ### Size
-- **World dimensions:** 2.5× viewport width × 2× viewport height
+- **World dimensions:** 1.3× viewport width × 1.2× viewport height
+  (`WORLD_WIDTH_MULTIPLIER` / `WORLD_HEIGHT_MULTIPLIER`, reduced from an
+  earlier 2.5×/2.0×, then 1.6×/1.4×, to leave less off-screen territory for
+  fish to flee into)
 - Fixed at game start based on device viewport. Does not resize mid-game.
 - The world is a finite lake — large but bounded. Not infinite, not wrapping.
 
@@ -195,10 +198,16 @@ Detected via window.innerHeight on mount and on resize/orientation change.
 
 ### Edge Behavior
 
-**Prey (fish):** Soft repulsion. Fish approaching within 80px of any world
-edge feel a gentle turning force added to their velocity. They curve away
-naturally. They never slam into walls. This looks organic and is consistent
-with Boids behavior.
+**Prey (fish):** Soft repulsion. Fish approaching within 140px
+(`EDGE_REPULSION_RADIUS`) of any world edge feel a turning force added to
+their velocity, ramping up to `EDGE_REPULSION_WEIGHT` (6.0) at the wall. They
+curve away naturally and, under normal conditions, never slam into walls.
+Backstopped by a hard positional clamp (Session 22) that prevents a fish from
+physically leaving the world regardless of velocity or whether the force
+balance holds. A fish pinned against a wall by sustained predator pressure
+was observed escaping off-screen before this was added; see ROADMAP.md
+Session 22 Bug 3 and the Difficulty Parameters table below for the tuning
+rationale.
 
 **Predator (shark):** Hard stop. Predator velocity zeroes on world boundary
 contact. Cornering fish against walls is an intentional and valid strategy.
@@ -238,8 +247,8 @@ Each fish looks at neighbors within a defined radius and computes four forces:
 |---|---|---|---|
 | Separation | Avoid crowding neighbors | 25px | 1.5 |
 | Alignment | Match heading of neighbors | 60px | 1.0 |
-| Cohesion | Drift toward group center | 80px | 1.0 |
-| Flee | Escape predator | 120px | 3.0 |
+| Cohesion | Drift toward group center | 100px | 1.1 |
+| Flee | Escape predator | 100px | 3.0 |
 | Edge repulsion | Turn away from world boundary | 140px | 6.0 |
 
 **Flee weight (3.0) deliberately dominates all flocking forces** when the
@@ -531,8 +540,7 @@ brief reason (see CONTRIBUTING.md "Tuning Discipline").
 
 | Parameter | v1 Value | Notes |
 |---|---|---|
-| `FISH_COUNT_MOBILE` | 30 | Viewport width < 768px |
-| `FISH_COUNT_DESKTOP` | 50 | |
+| `FISH_COUNT` | easy 70 / normal 60 / hardcore 50 | Per-difficulty, not per-device. The old device-based split (`FISH_COUNT_MOBILE` 30 / `FISH_COUNT_DESKTOP` 50) was removed once the landscape lock made mobile equivalent to desktop; see the Difficulty Modes table above |
 | `FISH_BASE_SPEED` | 2.5 | px/frame |
 | `FISH_FLEE_SPEED` | 4.0 | px/frame — at predator contact |
 | `SHARK_SPEED` | 3.8 | px/frame — constant across all difficulty modes |
@@ -546,9 +554,9 @@ brief reason (see CONTRIBUTING.md "Tuning Discipline").
 | `COHESION_WEIGHT` | 1.1 | Reduced post-playtest — school was too tight, easy to herd once learned |
 | `ANCHOR_WEIGHT` | 0.02 | Weak center-pull — lowered from 0.05 (too strong, school clumped unnaturally) |
 | `EDGE_REPULSION_RADIUS` | 140 | px from world boundary — raised from 120 (Session 22 tune: fish, 120/3.0, could be pushed off-screen by sustained Hardcore flee pressure at a corner — see ROADMAP.md Session 22) |
-| `EDGE_REPULSION_WEIGHT` | 6.0 | Raised from 3.0 — must exceed the worst-case FLEE_WEIGHT (4.0, Hardcore) with real margin, since flee is a constant-strength force while edge repulsion only ramps up near the wall; a hard positional clamp in updateFish() also backstops this regardless of tuning | |
+| `EDGE_REPULSION_WEIGHT` | 6.0 | Raised from 3.0. Must exceed the worst-case FLEE_WEIGHT (4.0, Hardcore) with real margin, since flee is a constant-strength force while edge repulsion only ramps up near the wall; a hard positional clamp in updateFish() also backstops this regardless of tuning |
 | `HITBOX_RADIUS` | 12 | px — fish catch detection (raised from 8: prevents single-frame tunnelling past a fish at high closing speed) |
-| `SHARK_OFFSET_MOBILE` | 80 | px above touch point |
+| `SHARK_OFFSET_MOBILE` | 80 | px above touch point. Legacy, pre-joystick; superseded by `JOYSTICK_RADIUS`/`JOYSTICK_MARGIN` (see the Predator/Player Control section above) |
 | `WORLD_WIDTH_MULTIPLIER` | 1.3 | × viewport width (reduced 2.5 → 1.6 → 1.3 — less off-screen territory for fish to flee into) |
 | `WORLD_HEIGHT_MULTIPLIER` | 1.2 | × viewport height (reduced 2.0 → 1.4 → 1.2 — same) |
 | `GAME_DURATION` | 60 | seconds |

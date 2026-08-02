@@ -99,6 +99,18 @@ sudo cp /home/jcube/projects/hunter/backend/hunter.service /etc/systemd/system/h
 
 Use `sudo tee` for any other system file writes. Never `sudo nano`.
 
+**`sudo systemctl status hunter` prompts for a password in practice**, despite
+being listed above. The sudoers drop-in appears to cover `start`/`stop`/
+`restart`/`enable` but not `status`. This has cost time in two consecutive
+sessions (Sessions 21 and 22). Don't fight it or try to fix the sudoers
+config; verify the service is up another way instead:
+
+```bash
+ss -tlnp | grep 8013                              # port is listening
+pgrep -af "hunter/backend/.venv/bin/uvicorn"       # process is running
+curl -s http://localhost:8013/api/health           # app is responding
+```
+
 ---
 
 ## Frontend Dev (local, Windows)
@@ -144,8 +156,10 @@ For local dev, the Vite proxy config in vite.config.js points /api → localhost
 ## Verification Steps (run after every deploy)
 
 ```bash
-# Service running
-sudo systemctl status hunter
+# Service running (see the sudo note above: status needs a password,
+# port/process/health below don't)
+ss -tlnp | grep 8013
+pgrep -af "hunter/backend/.venv/bin/uvicorn"
 
 # API responding
 curl https://hunter.job-joseph.com/api/health
