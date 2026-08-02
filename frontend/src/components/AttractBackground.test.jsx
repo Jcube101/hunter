@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render } from '@testing-library/react'
 import AttractBackground from './AttractBackground.jsx'
+import { installVisibilityStub } from '../test/deviceStubs.js'
 
 function makeFakeCtx() {
   return new Proxy(
@@ -64,19 +65,16 @@ describe('AttractBackground', () => {
 
   it('pauses on visibilitychange (hidden) and resumes when visible again', () => {
     const rafSpy = installRafSpy()
+    const visibility = installVisibilityStub()
     render(<AttractBackground />)
     const scheduledBeforeHide = rafSpy.raf.mock.calls.length
 
-    Object.defineProperty(document, 'hidden', { value: true, configurable: true })
-    document.dispatchEvent(new Event('visibilitychange'))
+    visibility.setHidden(true)
     expect(rafSpy.caf).toHaveBeenCalled()
     const scheduledWhileHidden = rafSpy.raf.mock.calls.length
     expect(scheduledWhileHidden).toBe(scheduledBeforeHide) // no new frame scheduled while hidden
 
-    Object.defineProperty(document, 'hidden', { value: false, configurable: true })
-    document.dispatchEvent(new Event('visibilitychange'))
+    visibility.setHidden(false)
     expect(rafSpy.raf.mock.calls.length).toBeGreaterThan(scheduledWhileHidden) // resumed
-
-    Object.defineProperty(document, 'hidden', { value: false, configurable: true }) // reset
   })
 })

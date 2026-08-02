@@ -61,7 +61,18 @@ describe('EndScreen submit-qualification wiring', () => {
     expect(await screen.findByPlaceholderText('Your name')).toBeInTheDocument()
   })
 
-  it('falls back to the personal-best rule when the preview fetch fails', async () => {
+  // KNOWN TO BE REVISITED (ROADMAP.md Session 19 addendum A6) — do not treat
+  // this as a settled contract. It pins TODAY's behavior: a rejected fetch
+  // (network error OR simply offline — the component can't currently tell
+  // them apart) falls back to the personal-best rule and shows the submit
+  // prompt. A6 argues that's wrong once offline is a normal state rather than
+  // an anomaly: a qualifying score reaches a POST that's guaranteed to fail
+  // and is silently lost, with no way to retry. When A6's offline-queue work
+  // lands, this bare-rejection case should split into "transient error →
+  // this PB-fallback path" vs "genuinely offline (navigator.onLine === false)
+  // → queue the submission instead," and this test's premise will need to
+  // change to reflect that split.
+  it('falls back to the personal-best rule when the preview fetch fails (pins current behavior — see ROADMAP A6 before treating this as settled)', async () => {
     setDesktop()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
     render(

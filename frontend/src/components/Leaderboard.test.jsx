@@ -71,6 +71,21 @@ describe('postScore', () => {
   })
 })
 
+// Freshness (ROADMAP.md Session 19 addendum A13/A7): qualifies() is a pure
+// function over whatever `entries` array it's handed — it has no notion of
+// where those entries came from or how stale they are. The tests below
+// correctly cover the comparison rule itself, but they provide zero
+// protection against A7's real concern: a stale/cached board silently
+// corrupting the top-10 cutoff this function computes. That's not a gap this
+// file can close — "entries must come from a live network fetch, never a
+// cache" is a property of the CALLER (EndScreen's loadPreview), not of
+// qualifies(), and there is no caching layer to test against yet (no service
+// worker exists in the repo — see A14). A test here that fakes "staleness" by
+// passing some array and asserting the same comparison outcome would just
+// re-test the rule already covered below under a misleading name — false
+// assurance, not real coverage. The real freshness test belongs at the
+// EndScreen/loadPreview layer once A7's caching work lands (e.g. asserting
+// the End screen's leaderboard fetch is always network-only).
 describe('qualifies', () => {
   it('qualifies when the board has room (< boardSize entries)', () => {
     expect(qualifies([{ score: 5 }], 1, 10)).toBe(true)

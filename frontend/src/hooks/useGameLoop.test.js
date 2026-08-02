@@ -39,6 +39,12 @@ function installRafSpy() {
 
 let rafSpy
 
+// Proposed backstop clamp from ROADMAP.md Session 19 addendum A2 — not yet
+// implemented. The exact value is a judgment call (the addendum floats
+// "~0.25s"); recorded here as the target the intended-behavior test below
+// checks against, not as a value pulled from source.
+const INTENDED_MAX_DT_SECONDS = 0.25
+
 beforeEach(() => {
   rafSpy = installRafSpy()
 })
@@ -78,7 +84,7 @@ describe('useGameLoop', () => {
     expect(dt).toBeCloseTo(1, 1)
   })
 
-  it('caps dt at 3 after a long stall (spiral-of-death guard)', () => {
+  it('caps motion dt at 3 after a long stall (spiral-of-death guard — physics/rendering only, NOT the round timer; see the dtSeconds tests below)', () => {
     const update = vi.fn()
     const { result } = renderHook(() => useGameLoop(update, () => {}))
     act(() => result.current.start())
@@ -86,6 +92,39 @@ describe('useGameLoop', () => {
     act(() => rafSpy.fire(1000 + 5000)) // huge gap: 5 real seconds later
     const [dt] = update.mock.calls[1]
     expect(dt).toBe(3)
+  })
+
+  // ROADMAP.md Session 19 addendum A1/A13: the test above only ever
+  // destructured `dt` (motion), never the second argument, `dtSeconds` (wall
+  // clock, used to decrement the round timer — App.jsx). That blind spot let
+  // a real bug hide behind a green "spiral-of-death guard" test: dtSeconds is
+  // NOT capped, so a 5-second stall (backgrounding the tab, an interruption)
+  // charges the FULL 5 seconds to the round clock in a single frame. This
+  // test pins that current, actual behavior — it passes today, and it is the
+  // bug the next test targets, not a spec to preserve.
+  it('documents current behavior: dtSeconds is uncapped after a long stall and equals the full gap (5s) — this is the round-clock bug from ROADMAP A2, not intended behavior', () => {
+    const update = vi.fn()
+    const { result } = renderHook(() => useGameLoop(update, () => {}))
+    act(() => result.current.start())
+    act(() => rafSpy.fire(1000))
+    act(() => rafSpy.fire(1000 + 5000))
+    const [, dtSeconds] = update.mock.calls[1]
+    expect(dtSeconds).toBe(5)
+  })
+
+  // Intended behavior (ROADMAP A2): a defensive dtSeconds clamp so a single
+  // frame can never consume more than a small slice of the round timer, even
+  // if the visibilitychange-pause fix is somehow bypassed. Expected to FAIL
+  // until that clamp lands (Phase 2) — this is the known-red test the phase
+  // exists to introduce, not a broken assertion.
+  it('[Phase 2] clamps dtSeconds after a long stall so a single interruption cannot burn most of the round timer', () => {
+    const update = vi.fn()
+    const { result } = renderHook(() => useGameLoop(update, () => {}))
+    act(() => result.current.start())
+    act(() => rafSpy.fire(1000))
+    act(() => rafSpy.fire(1000 + 5000))
+    const [, dtSeconds] = update.mock.calls[1]
+    expect(dtSeconds).toBeLessThanOrEqual(INTENDED_MAX_DT_SECONDS)
   })
 
   it('stop() cancels the frame and blocks further update/draw', () => {

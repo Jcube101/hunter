@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useFullscreen } from './useFullscreen.js'
+import { installOrientationStub } from '../test/deviceStubs.js'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -20,11 +21,7 @@ describe('useFullscreen — enter()', () => {
   it('calls requestFullscreen and orientation.lock when available', async () => {
     const requestFullscreen = vi.fn().mockResolvedValue(undefined)
     document.documentElement.requestFullscreen = requestFullscreen
-    const lock = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(window, 'screen', {
-      value: { orientation: { lock } },
-      configurable: true,
-    })
+    const { lock } = installOrientationStub()
 
     const { result } = renderHook(() => useFullscreen(() => {}))
     await act(async () => {
@@ -56,10 +53,7 @@ describe('useFullscreen — enter()', () => {
 
   it('swallows an orientation.lock rejection without throwing', async () => {
     document.documentElement.requestFullscreen = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(window, 'screen', {
-      value: { orientation: { lock: vi.fn().mockRejectedValue(new Error('unsupported')) } },
-      configurable: true,
-    })
+    installOrientationStub({ lockResolves: false })
     const { result } = renderHook(() => useFullscreen(() => {}))
     await expect(
       act(async () => {

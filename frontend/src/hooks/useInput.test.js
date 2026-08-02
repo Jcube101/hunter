@@ -10,7 +10,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useInput } from './useInput.js'
-import { JOYSTICK_BASE_X, JOYSTICK_BASE_Y, JOYSTICK_RADIUS } from '../constants/boids.js'
+import {
+  JOYSTICK_BASE_X,
+  JOYSTICK_BASE_Y,
+  JOYSTICK_RADIUS,
+  JOYSTICK_ACTIVATE_RADIUS,
+} from '../constants/boids.js'
 
 function makeCanvas(rect = { left: 0, top: 0, width: 800, height: 600 }) {
   const canvas = document.createElement('canvas')
@@ -167,5 +172,35 @@ describe('useInput — joystick (mobile)', () => {
     const preventMove = vi.spyOn(moveEvent, 'preventDefault')
     act(() => canvas.dispatchEvent(moveEvent))
     expect(preventMove).toHaveBeenCalled()
+  })
+})
+
+// --- Joystick placement safety (ROADMAP.md Session 19 addendum A13/B9) -----
+//
+// The functional tests above import JOYSTICK_BASE_X/Y and derive their
+// expected values from those same constants — so they stay green through any
+// retuning of JOYSTICK_MARGIN, including one that's functionally correct but
+// places the activation zone somewhere unsafe. They provide zero coverage of
+// the actual property B9 cares about: that a thumb reaching for the stick
+// doesn't land in Android's edge-gesture strip.
+//
+// This block asserts that invariant directly, against a threshold that is
+// NOT derived from JOYSTICK_MARGIN/JOYSTICK_BASE_* — so retuning those
+// constants can't silently satisfy its own check. SAFE_EDGE_MARGIN mirrors
+// Android's documented ~20-24dp back/home gesture-navigation edge exclusion.
+//
+// Currently FAILS: JOYSTICK_MARGIN=40 puts the activation circle only 20px
+// from both edges. Expected to pass once B9's margin increase lands.
+const SAFE_EDGE_MARGIN = 24 // px — independent of the joystick's own tuning constants
+
+describe('joystick placement — clears the Android gesture-navigation edges', () => {
+  it('activation zone stays >= SAFE_EDGE_MARGIN from the left edge', () => {
+    const distanceFromLeftEdge = JOYSTICK_BASE_X - JOYSTICK_ACTIVATE_RADIUS
+    expect(distanceFromLeftEdge).toBeGreaterThanOrEqual(SAFE_EDGE_MARGIN)
+  })
+
+  it('activation zone stays >= SAFE_EDGE_MARGIN from the bottom edge', () => {
+    const distanceFromBottomEdge = JOYSTICK_BASE_Y - JOYSTICK_ACTIVATE_RADIUS
+    expect(distanceFromBottomEdge).toBeGreaterThanOrEqual(SAFE_EDGE_MARGIN)
   })
 })
