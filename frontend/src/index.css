@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/* Safe-area insets (ROADMAP.md B3). index.html sets viewport-fit=cover, which
+   extends the page into the display cutout / rounded corners / gesture-bar
+   region on the promise that the app pads itself back out — these are that
+   padding, applied piecemeal at the edge-anchored elements that need it
+   (corner controls, the minimap, the joystick base in useInput.js) rather
+   than as one blanket root pad, since most of the layout is centered and
+   doesn't touch an edge. env() falls back to 0px on devices with no inset
+   (i.e. this is a no-op on hardware without a cutout/gesture bar).
+   useInput.js reads these same custom properties via getComputedStyle to
+   compose them into the joystick's touch geometry, not just its visuals. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
 /* Global resets for a fullscreen canvas game — no scroll, no text selection,
    no tap-highlight on mobile. The canvas owns the whole viewport. */
 html,

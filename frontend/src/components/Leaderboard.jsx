@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react'
 import { theme } from '../constants/theme.js'
 import { getPlatform } from '../utils/platform.js'
+import { useCompactViewport } from '../hooks/useCompactViewport.js'
 
 export const DIFFICULTY_TABS = ['easy', 'normal', 'hardcore']
 export const PLATFORM_TABS = ['desktop', 'mobile']
@@ -78,6 +79,13 @@ export function LeaderboardOverlay({ onClose, difficulty = 'normal', platform })
   const [activePlatform, setActivePlatform] = useState(() => platform || getPlatform())
   const [entries, setEntries] = useState([])
   const [status, setStatus] = useState('loading')
+  // Compact layout for constrained heights (ROADMAP.md B4) — a full 10-row
+  // board plus title/tabs/toggle/Close is ~530px against a ~393px landscape
+  // viewport. Unlike EndScreen/Tutorial, shrinking spacing alone can't get a
+  // 10-row list under that, so the card also caps its own height and lets
+  // only the ranked rows scroll (B6), keeping the header, tabs, and Close
+  // pinned and always reachable.
+  const isCompact = useCompactViewport()
 
   useEffect(() => {
     let cancelled = false
@@ -93,11 +101,20 @@ export function LeaderboardOverlay({ onClose, difficulty = 'normal', platform })
       className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm"
       onClick={onClose}
     >
+      {/* max-h-[90dvh] + flex column: header/tabs/toggle/Close (below) never
+          shrink, so only the ranked-list region (flex-1 min-h-0) scrolls when
+          the board doesn't fit (B4/B6). Backdrop click-to-close (above) still
+          works as the fallback dismissal even if Close itself were somehow
+          unreachable. */}
       <div
-        className="flex flex-col items-center gap-4 rounded-2xl border border-slate-700 bg-slate-900 px-8 py-7"
+        className={`flex max-h-[90dvh] flex-col items-center rounded-2xl border border-slate-700 bg-slate-900 ${
+          isCompact ? 'gap-2 px-5 py-4' : 'gap-4 px-8 py-7'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-2xl font-bold text-slate-100">Leaderboard</h3>
+        <h3 className={isCompact ? 'text-xl font-bold text-slate-100' : 'text-2xl font-bold text-slate-100'}>
+          Leaderboard
+        </h3>
         {/* Difficulty tabs */}
         <div className="flex items-center gap-2">
           {DIFFICULTY_TABS.map((tab) => {
@@ -107,7 +124,9 @@ export function LeaderboardOverlay({ onClose, difficulty = 'normal', platform })
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 aria-pressed={active}
-                className="rounded-lg px-4 py-1.5 text-sm font-semibold transition active:scale-95"
+                className={`rounded-lg font-semibold transition active:scale-95 ${
+                  isCompact ? 'px-3 py-1 text-xs' : 'px-4 py-1.5 text-sm'
+                }`}
                 style={active ? { color: theme.accent } : { color: '#64748b' }}
               >
                 {cap(tab)}
@@ -132,10 +151,16 @@ export function LeaderboardOverlay({ onClose, difficulty = 'normal', platform })
             )
           })}
         </div>
-        <LeaderboardList status={status} entries={entries} limit={10} />
+        {/* The only scrollable region — header/tabs/toggle/Close stay pinned
+            above and below it regardless of how many rows the board has. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <LeaderboardList status={status} entries={entries} limit={10} />
+        </div>
         <button
           onClick={onClose}
-          className="mt-1 rounded-lg border border-slate-600 px-6 py-2 text-sm font-semibold text-slate-200 transition active:scale-95"
+          className={`rounded-lg border border-slate-600 font-semibold text-slate-200 transition active:scale-95 ${
+            isCompact ? 'py-1.5 px-5 text-sm' : 'mt-1 py-2 px-6 text-sm'
+          }`}
         >
           Close
         </button>

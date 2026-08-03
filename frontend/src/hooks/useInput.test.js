@@ -7,7 +7,7 @@
 // sufficient (audit decision D7). getBoundingClientRect is stubbed per test
 // since jsdom has no layout engine and would otherwise return all zeros.
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useInput } from './useInput.js'
 import { installVisibilityStub } from '../test/deviceStubs.js'
@@ -259,6 +259,80 @@ describe('useInput — joystick (mobile)', () => {
     const visibility = installVisibilityStub()
     act(() => visibility.setHidden(true))
     expect(result.current.inputPosRef.current).toBeNull()
+  })
+})
+
+// --- Safe-area inset composition (ROADMAP.md B3, building on B9) -----------
+//
+// index.css sets --safe-left/--safe-bottom from env(safe-area-inset-*), 0 on
+// any device without a cutout/gesture-bar inset (including jsdom, which never
+// loads index.css — hence 0 in every test above). These tests set the custom
+// properties directly on document.documentElement, which useInput reads via
+// getComputedStyle exactly as it would in a browser that resolved env() to a
+// non-zero value.
+describe('useInput — joystick base composes safe-area insets with JOYSTICK_MARGIN (B3)', () => {
+  afterEach(() => {
+    document.documentElement.style.removeProperty('--safe-left')
+    document.documentElement.style.removeProperty('--safe-bottom')
+  })
+
+  it('shifts the activation zone by the safe-area inset, on top of the existing margin', () => {
+    document.documentElement.style.setProperty('--safe-left', '90px')
+    document.documentElement.style.setProperty('--safe-bottom', '90px')
+    const rect = { left: 0, top: 0, width: 800, height: 600 }
+    const canvas = makeCanvas(rect)
+    const canvasRef = { current: canvas }
+    const { result } = renderHook(() => useInput(canvasRef, { current: null }))
+
+    // Original base (no inset) would be at (JOYSTICK_BASE_X, height - JOYSTICK_BASE_Y).
+    // With the insets above, the real base is offset by (+90, -90).
+    const shiftedBaseX = JOYSTICK_BASE_X + 90
+    const shiftedBaseY = rect.height - JOYSTICK_BASE_Y - 90
+
+    act(() => {
+      canvas.dispatchEvent(
+        touchEvent('touchstart', [{ identifier: 1, clientX: shiftedBaseX, clientY: shiftedBaseY }]),
+      )
+    })
+    expect(result.current.joystickRef.current.active).toBe(true)
+    // A touch at the ORIGINAL (un-shifted) base center should now miss —
+    // proves the inset actually moved the zone rather than just being added
+    // as slack.
+  })
+
+  it('a touch at the original, un-shifted base center misses once insets are applied', () => {
+    document.documentElement.style.setProperty('--safe-left', '90px')
+    document.documentElement.style.setProperty('--safe-bottom', '90px')
+    const rect = { left: 0, top: 0, width: 800, height: 600 }
+    const canvas = makeCanvas(rect)
+    const canvasRef = { current: canvas }
+    const { result } = renderHook(() => useInput(canvasRef, { current: null }))
+
+    act(() => {
+      canvas.dispatchEvent(
+        touchEvent('touchstart', [
+          { identifier: 1, clientX: JOYSTICK_BASE_X, clientY: rect.height - JOYSTICK_BASE_Y },
+        ]),
+      )
+    })
+    // sqrt(90^2 + 90^2) ≈ 127px from the real (shifted) base — outside JOYSTICK_ACTIVATE_RADIUS (80).
+    expect(result.current.joystickRef.current.active).toBe(false)
+  })
+
+  it('defaults to zero inset (unchanged geometry) when the CSS custom properties are absent', () => {
+    const rect = { left: 0, top: 0, width: 800, height: 600 }
+    const canvas = makeCanvas(rect)
+    const canvasRef = { current: canvas }
+    const { result } = renderHook(() => useInput(canvasRef, { current: null }))
+
+    act(() => {
+      canvas.dispatchEvent(
+        touchEvent('touchstart', [
+          { identifier: 1, clientX: JOYSTICK_BASE_X, clientY: rect.height - JOYSTICK_BASE_Y },
+        ]),
+      )
+    })
+    expect(result.current.joystickRef.current.active).toBe(true)
   })
 })
 

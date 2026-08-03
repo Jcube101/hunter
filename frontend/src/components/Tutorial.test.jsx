@@ -26,6 +26,10 @@ function makeFakeCtx() {
   )
 }
 
+function setInnerHeight(h) {
+  Object.defineProperty(window, 'innerHeight', { value: h, configurable: true })
+}
+
 beforeEach(() => {
   localStorage.clear()
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(makeFakeCtx())
@@ -33,6 +37,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  setInnerHeight(768) // reset to jsdom's default
 })
 
 describe('Tutorial', () => {
@@ -101,5 +106,42 @@ describe('Tutorial', () => {
     fireEvent.touchStart(root, { changedTouches: [{ clientX: 100 }] })
     fireEvent.touchEnd(root, { changedTouches: [{ clientX: 200 }] }) // swipe right from slide 0
     expect(screen.getByText('Predator Instinct')).toBeInTheDocument() // still slide 0
+  })
+
+  // ROADMAP.md B5/B6/O25 — compact layout at landscape-phone heights. These
+  // prove which branch renders at a given innerHeight, not that content
+  // actually fits at 393px (jsdom has no layout engine — ROADMAP.md A14).
+  describe('compact layout (landscape phone heights, B5/O25)', () => {
+    it('the root is a scroll container regardless of compact mode (B6 fallback)', () => {
+      const { container } = render(<Tutorial onDone={() => {}} />)
+      expect(container.firstChild).toHaveClass('overflow-y-auto')
+    })
+
+    it('scales the illustration display size down in compact mode', () => {
+      setInnerHeight(393)
+      const { container } = render(<Tutorial onDone={() => {}} />)
+      const canvas = container.querySelector('canvas')
+      // Slide 1 is 200x120; compact scales display size by 0.7 (CSS only —
+      // the canvas still draws at full resolution, see the component header).
+      expect(canvas.style.width).toBe('140px')
+      expect(canvas.style.height).toBe('84px')
+    })
+
+    it('does not scale the illustration display size outside compact mode', () => {
+      setInnerHeight(800)
+      const { container } = render(<Tutorial onDone={() => {}} />)
+      const canvas = container.querySelector('canvas')
+      expect(canvas.style.width).toBe('200px')
+      expect(canvas.style.height).toBe('120px')
+    })
+
+    it('Next/Play remains reachable and title text shrinks in compact mode', () => {
+      setInnerHeight(393)
+      render(<Tutorial onDone={() => {}} />)
+      const heading = screen.getByText('Predator Instinct')
+      expect(heading).toHaveClass('text-xl')
+      expect(heading).not.toHaveClass('text-3xl')
+      expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument()
+    })
   })
 })

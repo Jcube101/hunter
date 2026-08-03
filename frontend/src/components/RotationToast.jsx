@@ -70,7 +70,7 @@ export function RotationToast() {
   if (!mounted) return null
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-8 z-50 flex justify-center px-4">
+    <div className="pointer-events-none absolute inset-x-0 [bottom:calc(2rem_+_var(--safe-bottom))] z-50 flex justify-center px-4">
       <div
         className="rounded-full bg-slate-900/90 px-5 py-2.5 text-sm font-medium text-slate-100 shadow-lg ring-1 ring-slate-700 transition-opacity duration-300"
         style={{ opacity: show ? 1 : 0 }}

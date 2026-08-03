@@ -11,7 +11,7 @@ const Minimap = forwardRef(function Minimap({ width, height }, ref) {
       ref={ref}
       width={width}
       height={height}
-      className="pointer-events-none absolute bottom-3 right-3 rounded-md"
+      className="pointer-events-none absolute [bottom:calc(0.75rem_+_var(--safe-bottom))] [right:calc(0.75rem_+_var(--safe-right))] rounded-md"
       style={{ width, height, border: `1px solid ${theme.minimap.border}` }}
     />
   )

@@ -42,7 +42,7 @@ export function Settings({ onClose, audioOn, onToggleAudio }) {
       <button
         onClick={onClose}
         aria-label="Close settings"
-        className="absolute right-4 top-4 rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-semibold text-slate-300 transition active:scale-95"
+        className="absolute [right:calc(1rem_+_var(--safe-right))] [top:calc(1rem_+_var(--safe-top))] rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-semibold text-slate-300 transition active:scale-95"
       >
         ✕
       </button>

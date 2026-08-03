@@ -10,6 +10,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { theme } from '../constants/theme.js'
 import { drawFish, drawShark } from '../game/renderer.js'
+import { useCompactViewport } from '../hooks/useCompactViewport.js'
+
+const COMPACT_ILLUSTRATION_SCALE = 0.7 // ROADMAP.md B5 — CSS display size only;
+// the canvas keeps drawing at full resolution (see the draw effect below), so
+// this just asks the browser to display the same bitmap smaller. Illustration
+// draw functions are untouched.
 
 const TUTORIAL_KEY = 'hunter_tutorial_seen'
 const SWIPE_THRESHOLD = 40 // px of horizontal travel to count as a swipe
@@ -197,6 +203,10 @@ export default function Tutorial({ onDone }) {
   const [touchStartX, setTouchStartX] = useState(null)
   const canvasRef = useRef(null)
   const isLast = index === SLIDES.length - 1
+  // Compact layout for constrained heights (landscape phones, ROADMAP.md
+  // B5/O24) — this is the first-run screen, so the worst place for a clipped
+  // Next/Play button.
+  const isCompact = useCompactViewport()
 
   // Draw the active slide's illustration. Slide 3 animates via rAF (cleaned up).
   useEffect(() => {
@@ -244,52 +254,69 @@ export default function Tutorial({ onDone }) {
   }
 
   const slide = SLIDES[index]
+  // Display size only (B5) — canvas.width/height in the draw effect above
+  // stays at the slide's full resolution regardless of this.
+  const displayW = isCompact ? Math.round(slide.w * COMPACT_ILLUSTRATION_SCALE) : slide.w
+  const displayH = isCompact ? Math.round(slide.h * COMPACT_ILLUSTRATION_SCALE) : slide.h
 
   return (
+    // Root is a scroll container (B6 fallback), same pattern as EndScreen;
+    // compact mode below is what keeps this from actually being needed at
+    // 393px in practice. Swipe handlers stay here since they only read touch
+    // coordinates, not scroll position.
     <div
-      className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-8 px-6 text-center"
+      className="absolute inset-0 z-20 overflow-y-auto overscroll-contain"
       style={{ background: theme.background }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* Skip — top-right */}
-      <button
-        onClick={dismiss}
-        className="absolute right-4 top-4 rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-semibold text-slate-300 transition active:scale-95"
+      <div
+        className={`flex min-h-full flex-col items-center justify-center px-6 text-center ${
+          isCompact ? 'gap-3 py-4' : 'gap-8'
+        }`}
       >
-        Skip
-      </button>
+        {/* Skip — top-right, offset past the safe-area inset (B3) */}
+        <button
+          onClick={dismiss}
+          className="absolute [right:calc(1rem_+_var(--safe-right))] [top:calc(1rem_+_var(--safe-top))] rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-semibold text-slate-300 transition active:scale-95"
+        >
+          Skip
+        </button>
 
-      <canvas
-        ref={canvasRef}
-        style={{ width: slide.w, height: slide.h }}
-        aria-hidden="true"
-      />
-      <div className="flex flex-col items-center gap-3">
-        <h2 className="text-3xl font-bold sm:text-4xl" style={{ color: theme.accent }}>
-          {slide.title}
-        </h2>
-        <p className="max-w-sm text-base text-slate-300">{slide.body}</p>
+        <canvas ref={canvasRef} style={{ width: displayW, height: displayH }} aria-hidden="true" />
+        <div className={`flex flex-col items-center ${isCompact ? 'gap-1.5' : 'gap-3'}`}>
+          <h2
+            className={`font-bold ${isCompact ? 'text-xl' : 'text-3xl sm:text-4xl'}`}
+            style={{ color: theme.accent }}
+          >
+            {slide.title}
+          </h2>
+          <p className={`max-w-sm text-slate-300 ${isCompact ? 'text-sm' : 'text-base'}`}>
+            {slide.body}
+          </p>
+        </div>
+
+        {/* Slide dots */}
+        <div className="flex items-center gap-2">
+          {SLIDES.map((_, i) => (
+            <span
+              key={i}
+              className="h-2 w-2 rounded-full transition"
+              style={{ backgroundColor: i === index ? theme.accent : '#334155' }}
+            />
+          ))}
+        </div>
+
+        <button
+          onClick={next}
+          className={`rounded-xl px-12 font-bold text-slate-900 transition active:scale-95 ${
+            isCompact ? 'py-2 text-base' : 'py-3 text-lg'
+          }`}
+          style={{ backgroundColor: theme.accent }}
+        >
+          {isLast ? 'Play' : 'Next'}
+        </button>
       </div>
-
-      {/* Slide dots */}
-      <div className="flex items-center gap-2">
-        {SLIDES.map((_, i) => (
-          <span
-            key={i}
-            className="h-2 w-2 rounded-full transition"
-            style={{ backgroundColor: i === index ? theme.accent : '#334155' }}
-          />
-        ))}
-      </div>
-
-      <button
-        onClick={next}
-        className="rounded-xl px-12 py-3 text-lg font-bold text-slate-900 transition active:scale-95"
-        style={{ backgroundColor: theme.accent }}
-      >
-        {isLast ? 'Play' : 'Next'}
-      </button>
     </div>
   )
 }

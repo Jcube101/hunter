@@ -26,6 +26,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { theme, ACTIVE_THEME } from '../constants/theme.js'
 import { getPlatform } from '../utils/platform.js'
+import { useCompactViewport } from '../hooks/useCompactViewport.js'
 import {
   getLeaderboard,
   postScore,
@@ -37,9 +38,20 @@ import {
 
 const MAX_NAME_LENGTH = 20
 const TOP_PREVIEW = 5
+const COMPACT_TOP_PREVIEW = 3 // ROADMAP.md B1 — cut rows so compact mode fits at 393px
 const BOARD_SIZE = 10 // top-N kept per board (matches backend LIMIT)
 
 export default function EndScreen({ score, personalBest, isNewPB, difficulty, onPlayAgain, onMenu }) {
+  // Compact layout for constrained heights (landscape phones) — see B1/B6/O25
+  // below. Full content (heading + mode + PB + new-PB + name input + 5-row
+  // preview + actions) can exceed 580 CSS px against a ~393px landscape
+  // viewport; compact mode brings the worst realistic case (a qualifying,
+  // new-PB round) under that without needing to scroll. The scroll container
+  // on the root (below) stays as a fallback for anything not accounted for
+  // here, not as the primary fit strategy.
+  const isCompact = useCompactViewport()
+  const topPreviewLimit = isCompact ? COMPACT_TOP_PREVIEW : TOP_PREVIEW
+
   // The player's real platform — used for submit AND as the default board to view.
   const [myPlatform] = useState(getPlatform)
 
@@ -126,104 +138,166 @@ export default function EndScreen({ score, personalBest, isNewPB, difficulty, on
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6 text-center">
-      <h2 className="text-4xl font-bold text-slate-100 sm:text-5xl">
-        You caught <span style={{ color: theme.accent }}>{score}</span>
-      </h2>
-      {difficulty && (
-        <p className="-mt-3 text-sm font-medium uppercase tracking-wider text-slate-500">
-          {cap(difficulty)} mode
-        </p>
-      )}
-
-      <p className="text-sm text-slate-400">
-        Personal best: <span className="font-semibold text-slate-200">{personalBest}</span>
-      </p>
-
-      {isNewPB && (
-        <p className="text-lg font-semibold" style={{ color: theme.accent }}>
-          New personal best! 🎉
-        </p>
-      )}
-
-      {/* Offline: submission is a dead end, not a fallback case (see file
-          header note) — a clear message instead of a doomed name input/POST. */}
-      {isOffline && (
-        <p className="text-sm text-slate-400">
-          You&apos;re offline — scores can&apos;t be submitted right now.
-        </p>
-      )}
-
-      {/* Opt-in submit — shown when the score qualifies for the top 10 */}
-      {canSubmit && submitState !== 'done' && (
-        <div className="flex flex-col items-center gap-2">
-          <input
-            type="text"
-            value={name}
-            maxLength={MAX_NAME_LENGTH}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Your name"
-            className="w-56 rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-center text-slate-100 outline-none focus:border-slate-400"
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={submitState === 'posting' || !name.trim()}
-            className="rounded-lg px-6 py-2 text-sm font-bold text-slate-900 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-            style={{ backgroundColor: theme.accent }}
+    // Root is a scroll container, not the flex/centering element itself (B6):
+    // the inner div below centers via min-h-full when content fits, and the
+    // page scrolls when it doesn't, rather than silently clipping. Compact
+    // mode (below) is what keeps this from actually being needed at 393px in
+    // the realistic worst case — this is the fallback net, not the fit
+    // strategy. overscroll-contain stops a drag here from reaching the
+    // pull-to-refresh gesture behind it.
+    <div className="absolute inset-0 overflow-y-auto overscroll-contain">
+      <div
+        className={`flex min-h-full flex-col items-center justify-center px-6 text-center ${
+          isCompact ? 'gap-2 py-4' : 'gap-5'
+        }`}
+      >
+        <h2
+          className={`font-bold text-slate-100 ${isCompact ? 'text-2xl' : 'text-4xl sm:text-5xl'}`}
+        >
+          You caught <span style={{ color: theme.accent }}>{score}</span>
+        </h2>
+        {difficulty && (
+          <p
+            className={`font-medium uppercase tracking-wider text-slate-500 ${
+              isCompact ? 'text-xs' : '-mt-3 text-sm'
+            }`}
           >
-            {submitState === 'posting' ? 'Adding…' : 'Add to leaderboard'}
-          </button>
-          {submitState === 'error' && (
-            <span className="text-xs text-rose-400">Something went wrong. Try again</span>
-          )}
+            {cap(difficulty)} mode
+          </p>
+        )}
+
+        <p className={isCompact ? 'text-xs text-slate-400' : 'text-sm text-slate-400'}>
+          Personal best: <span className="font-semibold text-slate-200">{personalBest}</span>
+        </p>
+
+        {isNewPB && (
+          <p
+            className={`font-semibold ${isCompact ? 'text-sm' : 'text-lg'}`}
+            style={{ color: theme.accent }}
+          >
+            New personal best! 🎉
+          </p>
+        )}
+
+        {/* Offline: submission is a dead end, not a fallback case (see file
+            header note) — a clear message instead of a doomed name input/POST. */}
+        {isOffline && (
+          <p className="text-sm text-slate-400">
+            You&apos;re offline — scores can&apos;t be submitted right now.
+          </p>
+        )}
+
+        {/* Opt-in submit — shown when the score qualifies for the top 10.
+            Compact: input and button sit side by side instead of stacked,
+            since 851px of width is not the constraint here, 393px of height
+            is (B1) — that alone cuts this block's footprint roughly in half. */}
+        {canSubmit && submitState !== 'done' && (
+          <div className="flex flex-col items-center gap-2">
+            <div className={`flex items-center gap-2 ${isCompact ? 'flex-row' : 'flex-col'}`}>
+              <input
+                type="text"
+                value={name}
+                maxLength={MAX_NAME_LENGTH}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                className={`rounded-lg border border-slate-600 bg-slate-900 text-center text-slate-100 outline-none focus:border-slate-400 ${
+                  isCompact ? 'w-36 py-1.5' : 'w-56 py-2'
+                }`}
+              />
+              <button
+                onClick={handleSubmit}
+                disabled={submitState === 'posting' || !name.trim()}
+                className={`rounded-lg px-6 text-sm font-bold text-slate-900 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 ${
+                  isCompact ? 'py-1.5' : 'py-2'
+                }`}
+                style={{ backgroundColor: theme.accent }}
+              >
+                {submitState === 'posting' ? 'Adding…' : 'Add to leaderboard'}
+              </button>
+            </div>
+            {submitState === 'error' && (
+              <span className="text-xs text-rose-400">Something went wrong. Try again</span>
+            )}
+          </div>
+        )}
+        {submitState === 'done' && (
+          <p className="text-sm font-semibold text-emerald-400">Added to leaderboard! 🎉</p>
+        )}
+
+        {/* Top preview for the difficulty just played, on the player's platform.
+            5 rows normally; 3 in compact (B1) — rows are single-line
+            (LeaderboardList truncates names), so this is the one place row
+            count actually controls the section's height. */}
+        <div className={`flex flex-col items-center gap-2 ${isCompact ? 'mt-0' : 'mt-1'}`}>
+          <span className="text-xs uppercase tracking-widest text-slate-500">
+            Top scores: {cap(difficulty)} · {cap(myPlatform)}
+          </span>
+          <LeaderboardList status={status} entries={entries} limit={topPreviewLimit} />
         </div>
-      )}
-      {submitState === 'done' && (
-        <p className="text-sm font-semibold text-emerald-400">Added to leaderboard! 🎉</p>
-      )}
 
-      {/* Top-5 preview for the difficulty just played, on the player's platform */}
-      <div className="mt-1 flex flex-col items-center gap-2">
-        <span className="text-xs uppercase tracking-widest text-slate-500">
-          Top scores: {cap(difficulty)} · {cap(myPlatform)}
-        </span>
-        <LeaderboardList status={status} entries={entries} limit={TOP_PREVIEW} />
-      </div>
-
-      <div className="mt-1 flex flex-col items-center gap-3">
         {/* Play Again stays the primary action; Menu is a secondary sibling that
             returns to the start screen (same transition as Pause → Quit, so
-            attract mode resumes via App's mount logic). */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onPlayAgain}
-            className="rounded-xl px-12 py-3 text-lg font-bold text-slate-900 transition active:scale-95"
-            style={{ backgroundColor: theme.accent }}
-          >
-            Play Again
-          </button>
-          <button
-            onClick={onMenu}
-            className="rounded-xl border border-slate-600 px-6 py-3 text-sm font-semibold text-slate-300 transition active:scale-95"
-          >
-            Menu
-          </button>
+            attract mode resumes via App's mount logic). Compact: all three
+            actions share one row instead of two (B1's "one row" suggestion) —
+            851px of width comfortably fits three buttons. */}
+        <div className={`flex flex-col items-center ${isCompact ? 'mt-0 gap-2' : 'mt-1 gap-3'}`}>
+          {isCompact ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onPlayAgain}
+                className="rounded-xl px-6 py-2 text-base font-bold text-slate-900 transition active:scale-95"
+                style={{ backgroundColor: theme.accent }}
+              >
+                Play Again
+              </button>
+              <button
+                onClick={onMenu}
+                className="rounded-xl border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-300 transition active:scale-95"
+              >
+                Menu
+              </button>
+              <button
+                onClick={() => setShowFull(true)}
+                className="rounded-xl border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 transition active:scale-95"
+              >
+                Full Leaderboard
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={onPlayAgain}
+                  className="rounded-xl px-12 py-3 text-lg font-bold text-slate-900 transition active:scale-95"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  Play Again
+                </button>
+                <button
+                  onClick={onMenu}
+                  className="rounded-xl border border-slate-600 px-6 py-3 text-sm font-semibold text-slate-300 transition active:scale-95"
+                >
+                  Menu
+                </button>
+              </div>
+              <button
+                onClick={() => setShowFull(true)}
+                className="rounded-xl border border-slate-600 px-8 py-2 text-sm font-semibold text-slate-200 transition active:scale-95"
+              >
+                Full Leaderboard
+              </button>
+            </>
+          )}
         </div>
-        <button
-          onClick={() => setShowFull(true)}
-          className="rounded-xl border border-slate-600 px-8 py-2 text-sm font-semibold text-slate-200 transition active:scale-95"
-        >
-          Full Leaderboard
-        </button>
-      </div>
 
-      {showFull && (
-        <LeaderboardOverlay
-          difficulty={difficulty}
-          platform={myPlatform}
-          onClose={() => setShowFull(false)}
-        />
-      )}
+        {showFull && (
+          <LeaderboardOverlay
+            difficulty={difficulty}
+            platform={myPlatform}
+            onClose={() => setShowFull(false)}
+          />
+        )}
+      </div>
     </div>
   )
 }

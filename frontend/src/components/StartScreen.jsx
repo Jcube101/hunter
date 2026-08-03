@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { theme } from '../constants/theme.js'
+import { useCompactViewport } from '../hooks/useCompactViewport.js'
 
 const DIFFICULTIES = [
   ['easy', 'Easy'],
@@ -22,7 +23,7 @@ export default function StartScreen({
   const [personalBest, setPersonalBest] = useState(null)
   // Compact layout for constrained heights (landscape phones) so nothing clips
   // or scrolls. Portrait/desktop keep the normal layout unchanged.
-  const [isCompact, setIsCompact] = useState(() => window.innerHeight < 500)
+  const isCompact = useCompactViewport()
 
   // Show the PB for the currently selected difficulty; updates when the player
   // switches difficulty. Each mode has its own key (hunter_pb_<difficulty>).
@@ -31,27 +32,18 @@ export default function StartScreen({
     setPersonalBest(stored !== null ? parseInt(stored, 10) : null)
   }, [difficulty])
 
-  useEffect(() => {
-    const handler = () => setIsCompact(window.innerHeight < 500)
-    window.addEventListener('resize', handler)
-    window.addEventListener('orientationchange', handler)
-    return () => {
-      window.removeEventListener('resize', handler)
-      window.removeEventListener('orientationchange', handler)
-    }
-  }, [])
-
   return (
     <div
       className={`absolute inset-0 flex flex-col items-center justify-center px-6 text-center ${
         isCompact ? 'gap-2' : 'gap-6'
       }`}
     >
-      {/* Settings — top-left, gear icon */}
+      {/* Settings — top-left, gear icon. Offset pads past the safe-area inset
+          (notch/rounded-corner) on top of the normal 16px margin (B3). */}
       <button
         onClick={onOpenSettings}
         aria-label="Settings"
-        className="absolute left-4 top-4 rounded-lg border border-slate-700 px-3 py-2 text-xl leading-none text-slate-200 transition active:scale-95"
+        className="absolute [left:calc(1rem_+_var(--safe-left))] [top:calc(1rem_+_var(--safe-top))] rounded-lg border border-slate-700 px-3 py-2 text-xl leading-none text-slate-200 transition active:scale-95"
       >
         ⚙
       </button>
@@ -62,7 +54,7 @@ export default function StartScreen({
         onClick={onToggleAudio}
         aria-label={audioOn ? 'Turn sound off' : 'Turn sound on'}
         aria-pressed={audioOn}
-        className="absolute right-4 top-4 rounded-lg border border-slate-700 px-3 py-2 text-xl leading-none text-slate-200 transition active:scale-95"
+        className="absolute [right:calc(1rem_+_var(--safe-right))] [top:calc(1rem_+_var(--safe-top))] rounded-lg border border-slate-700 px-3 py-2 text-xl leading-none text-slate-200 transition active:scale-95"
       >
         {audioOn ? '🔊' : '🔇'}
       </button>
@@ -155,7 +147,9 @@ export default function StartScreen({
       )}
 
       {!isCompact && (
-        <p className="absolute bottom-6 text-xs text-slate-500">Best played in landscape</p>
+        <p className="absolute [bottom:calc(1.5rem_+_var(--safe-bottom))] text-xs text-slate-500">
+          Best played in landscape
+        </p>
       )}
     </div>
   )

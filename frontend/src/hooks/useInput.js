@@ -29,6 +29,15 @@ export function useInput(canvasRef, cameraRef) {
   const joystickRef = useRef({ active: false, dx: 0, dy: 0 })
   // Which touch identifier currently owns the stick (ignore other fingers).
   const touchIdRef = useRef(null)
+  // Safe-area insets (px), composed into the joystick's touch geometry on top
+  // of JOYSTICK_MARGIN, not instead of it (ROADMAP.md B3, building on B9's
+  // margin increase). Read from the CSS custom properties index.css sets from
+  // env(safe-area-inset-*); 0 on any device without a cutout/gesture-bar
+  // inset, so this is a no-op there, including in tests (jsdom never loads
+  // index.css). Cached in a ref and refreshed on resize/orientationchange
+  // rather than read on every touch event, since a drag can fire touchmove
+  // far more often than the inset could plausibly change.
+  const insetRef = useRef({ left: 0, bottom: 0 })
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -44,8 +53,26 @@ export function useInput(canvasRef, cameraRef) {
     }
 
     // --- Joystick (mobile) ---------------------------------------------------
-    // Base center in canvas-local screen coords (bottom-left, fixed).
-    const baseCenter = (rect) => ({ x: JOYSTICK_BASE_X, y: rect.height - JOYSTICK_BASE_Y })
+    const readInsets = () => {
+      const cs = getComputedStyle(document.documentElement)
+      const left = parseFloat(cs.getPropertyValue('--safe-left'))
+      const bottom = parseFloat(cs.getPropertyValue('--safe-bottom'))
+      insetRef.current = {
+        left: Number.isFinite(left) ? left : 0,
+        bottom: Number.isFinite(bottom) ? bottom : 0,
+      }
+    }
+    readInsets()
+    window.addEventListener('resize', readInsets)
+    window.addEventListener('orientationchange', readInsets)
+
+    // Base center in canvas-local screen coords (bottom-left). JOYSTICK_MARGIN
+    // is the primary spacing (B9); the safe-area inset adds on top of it when
+    // a device reports one, so the two compose rather than fight.
+    const baseCenter = (rect) => ({
+      x: JOYSTICK_BASE_X + insetRef.current.left,
+      y: rect.height - JOYSTICK_BASE_Y - insetRef.current.bottom,
+    })
 
     // Compute direction + knob offset from a touch point relative to base center.
     const applyStick = (localX, localY) => {
@@ -143,6 +170,8 @@ export function useInput(canvasRef, cameraRef) {
       canvas.removeEventListener('touchcancel', onTouchEnd)
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.removeEventListener('blur', onStrand)
+      window.removeEventListener('resize', readInsets)
+      window.removeEventListener('orientationchange', readInsets)
     }
   }, [canvasRef, cameraRef])
 

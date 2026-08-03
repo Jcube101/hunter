@@ -24,8 +24,13 @@ function mockFetchOnce(body, ok = true, status = 200) {
   return fn
 }
 
+function setInnerHeight(h) {
+  Object.defineProperty(window, 'innerHeight', { value: h, configurable: true })
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
+  setInnerHeight(768) // reset to jsdom's default
 })
 
 describe('cap', () => {
@@ -186,5 +191,38 @@ describe('LeaderboardOverlay', () => {
     expect(onClose).not.toHaveBeenCalled()
     fireEvent.click(container.firstChild) // the backdrop itself
     expect(onClose).toHaveBeenCalled()
+  })
+
+  // ROADMAP.md B4/B6 — the card caps its own height and only the ranked-list
+  // region scrolls, so Close stays reachable regardless of board size. These
+  // prove the branch/structure, not that it visually fits at 393px (jsdom
+  // has no layout engine — ROADMAP.md A14).
+  describe('compact layout and the scrollable list region (B4/B6)', () => {
+    it('Close is reachable and clickable with a full 10-row board, compact or not', async () => {
+      setInnerHeight(393)
+      const full = Array.from({ length: 10 }, (_, i) => ({ id: i, name: `P${i}`, score: 10 - i }))
+      mockFetchOnce(full)
+      const onClose = vi.fn()
+      render(<LeaderboardOverlay difficulty="normal" platform="desktop" onClose={onClose} />)
+      await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(10))
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      expect(onClose).toHaveBeenCalled()
+    })
+
+    it('only the ranked-list region is the scroll container, not the whole card', async () => {
+      mockFetchOnce([])
+      render(<LeaderboardOverlay difficulty="normal" platform="desktop" onClose={() => {}} />)
+      await waitFor(() => screen.getByText('Leaderboard'))
+      const list = screen.getByText(/no scores yet/i)
+      expect(list.parentElement).toHaveClass('overflow-y-auto')
+    })
+
+    it('uses tighter spacing in compact mode', async () => {
+      setInnerHeight(393)
+      mockFetchOnce([])
+      render(<LeaderboardOverlay difficulty="normal" platform="desktop" onClose={() => {}} />)
+      await waitFor(() => screen.getByText('Leaderboard'))
+      expect(screen.getByText('Leaderboard')).toHaveClass('text-xl')
+    })
   })
 })

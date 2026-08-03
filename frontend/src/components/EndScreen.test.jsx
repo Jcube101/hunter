@@ -30,9 +30,14 @@ function setOnline(online) {
   Object.defineProperty(navigator, 'onLine', { value: online, configurable: true })
 }
 
+function setInnerHeight(h) {
+  Object.defineProperty(window, 'innerHeight', { value: h, configurable: true })
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
   setOnline(true) // reset to jsdom's default so other test files aren't affected
+  setInnerHeight(768) // reset to jsdom's default
 })
 
 describe('EndScreen submit-qualification wiring', () => {
@@ -266,6 +271,83 @@ describe('EndScreen submit-qualification wiring', () => {
     )
     await screen.findByPlaceholderText('Your name')
     expect(screen.getByRole('button', { name: /add to leaderboard/i })).toBeDisabled()
+  })
+
+  // ROADMAP.md B1/B6/O25 — compact layout at landscape-phone heights. These
+  // tests prove which branch renders at a given innerHeight; jsdom has no
+  // layout engine, so they cannot prove content actually fits at 393px (see
+  // ROADMAP.md A14). Real fit is a device check.
+  describe('compact layout (landscape phone heights, B1/B6/O25)', () => {
+    it('the root is a scroll container regardless of compact mode (B6 fallback)', () => {
+      setDesktop()
+      fetchMock({ getBody: [] })
+      const { container } = render(
+        <EndScreen score={5} personalBest={0} isNewPB={false} difficulty="easy" onPlayAgain={() => {}} onMenu={() => {}} />,
+      )
+      expect(container.firstChild).toHaveClass('overflow-y-auto')
+    })
+
+    it('shows only 3 top-score rows in compact mode, not 5', async () => {
+      setDesktop()
+      setInnerHeight(393)
+      const entries = Array.from({ length: 10 }, (_, i) => ({ id: i, name: `P${i}`, score: 10 - i }))
+      fetchMock({ getBody: entries })
+      render(
+        <EndScreen score={0} personalBest={0} isNewPB={false} difficulty="easy" onPlayAgain={() => {}} onMenu={() => {}} />,
+      )
+      await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(3))
+    })
+
+    it('shows all 5 top-score rows outside compact mode', async () => {
+      setDesktop()
+      setInnerHeight(800)
+      const entries = Array.from({ length: 10 }, (_, i) => ({ id: i, name: `P${i}`, score: 10 - i }))
+      fetchMock({ getBody: entries })
+      render(
+        <EndScreen score={0} personalBest={0} isNewPB={false} difficulty="easy" onPlayAgain={() => {}} onMenu={() => {}} />,
+      )
+      await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(5))
+    })
+
+    it('Play Again, Menu, and Full Leaderboard all remain reachable in compact mode', async () => {
+      setDesktop()
+      setInnerHeight(393)
+      const onPlayAgain = vi.fn()
+      const onMenu = vi.fn()
+      fetchMock({ getBody: [] })
+      render(
+        <EndScreen score={5} personalBest={0} isNewPB={false} difficulty="easy" onPlayAgain={onPlayAgain} onMenu={onMenu} />,
+      )
+      await waitFor(() => expect(screen.getByText(/top scores/i)).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: 'Play Again' }))
+      expect(onPlayAgain).toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+      expect(onMenu).toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Full Leaderboard' }))
+      expect(screen.getByText('Leaderboard')).toBeInTheDocument() // overlay opened
+    })
+
+    it('the name input and submit button sit in one row in compact mode', async () => {
+      setDesktop()
+      setInnerHeight(393)
+      fetchMock({ getBody: [] })
+      render(
+        <EndScreen score={5} personalBest={0} isNewPB={false} difficulty="easy" onPlayAgain={() => {}} onMenu={() => {}} />,
+      )
+      const input = await screen.findByPlaceholderText('Your name')
+      expect(input.parentElement).toHaveClass('flex-row')
+    })
+
+    it('the name input and submit button stack vertically outside compact mode', async () => {
+      setDesktop()
+      setInnerHeight(800)
+      fetchMock({ getBody: [] })
+      render(
+        <EndScreen score={5} personalBest={0} isNewPB={false} difficulty="easy" onPlayAgain={() => {}} onMenu={() => {}} />,
+      )
+      const input = await screen.findByPlaceholderText('Your name')
+      expect(input.parentElement).toHaveClass('flex-col')
+    })
   })
 
   it('a successful submit refreshes the preview (second GET fetch)', async () => {
