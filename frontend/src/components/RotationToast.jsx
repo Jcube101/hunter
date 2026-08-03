@@ -4,6 +4,12 @@
 // (sessionStorage, not localStorage — so it reappears next session). Appears 1s
 // after mount, auto-dismisses after 4s, and never blocks interaction
 // (pointer-events-none).
+//
+// Orientation is re-evaluated on resize/orientationchange, not sampled once at
+// mount (ROADMAP.md B10): rotating into portrait after mount arms the timer,
+// and rotating back to landscape before it fires cancels it. The sessionStorage
+// guard still means it shows at most once per session, however many times the
+// player rotates.
 
 import { useEffect, useState } from 'react'
 import { isTouchDevice } from '../utils/platform.js'
@@ -16,13 +22,16 @@ export function RotationToast() {
   const [show, setShow] = useState(false) // drives the opacity transition
 
   useEffect(() => {
-    const isPortrait = window.innerHeight > window.innerWidth
-    if (!isTouchDevice() || !isPortrait) return undefined
+    if (!isTouchDevice()) return undefined
     if (sessionStorage.getItem(SESSION_KEY)) return undefined
 
+    let showTimer
     let hideTimer
     let unmountTimer
-    const showTimer = setTimeout(() => {
+    let armed = false // a show timer is currently pending for this portrait phase
+
+    const fire = () => {
+      if (sessionStorage.getItem(SESSION_KEY)) return
       sessionStorage.setItem(SESSION_KEY, 'true')
       setMounted(true)
       // Next frame: flip opacity to 1 so the transition runs (fade in).
@@ -31,12 +40,30 @@ export function RotationToast() {
         setShow(false) // fade out
         unmountTimer = setTimeout(() => setMounted(false), FADE_MS)
       }, 4000)
-    }, 1000)
+    }
+
+    const checkOrientation = () => {
+      const isPortrait = window.innerHeight > window.innerWidth
+      if (isPortrait && !armed) {
+        armed = true
+        showTimer = setTimeout(fire, 1000)
+      } else if (!isPortrait && armed) {
+        // Rotated back to landscape before the hint fired — cancel it.
+        armed = false
+        clearTimeout(showTimer)
+      }
+    }
+
+    checkOrientation()
+    window.addEventListener('resize', checkOrientation)
+    window.addEventListener('orientationchange', checkOrientation)
 
     return () => {
       clearTimeout(showTimer)
       clearTimeout(hideTimer)
       clearTimeout(unmountTimer)
+      window.removeEventListener('resize', checkOrientation)
+      window.removeEventListener('orientationchange', checkOrientation)
     }
   }, [])
 

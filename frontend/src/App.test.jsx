@@ -159,3 +159,59 @@ describe('App — endGame() difficulty (Session 22 Bug 1)', () => {
     expect(localStorage.getItem('hunter_pb_hardcore')).toBe('20')
   })
 })
+
+// ROADMAP.md O21/A2: the only mobile pause path used to be fullscreen-exit,
+// which depends on the back/app-switch gesture firing `fullscreenchange` — not
+// guaranteed in a standalone PWA session. visibilitychange is a second,
+// independent pause path that fires regardless of fullscreen semantics.
+describe('App — visibilitychange pauses an in-progress round (O21/A2)', () => {
+  function setHidden(hidden) {
+    Object.defineProperty(document, 'hidden', { value: hidden, configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  }
+
+  afterEach(() => {
+    Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+  })
+
+  it('pauses the round when the document is hidden mid-play, without needing fullscreenchange', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    await waitFor(() => expect(window.__hunter.stateRef.current).toBe('playing'))
+
+    const cafCallsBefore = rafSpy.caf.mock.calls.length
+    act(() => setHidden(true))
+
+    expect(window.__hunter.stateRef.current).toBe('paused')
+    // The loop must actually stop, not just flip the screen state.
+    expect(rafSpy.caf.mock.calls.length).toBeGreaterThan(cafCallsBefore)
+  })
+
+  it('does nothing when hidden while not playing (e.g. on the start screen)', () => {
+    render(<App />)
+    expect(window.__hunter.stateRef.current).toBe('start')
+    act(() => setHidden(true))
+    expect(window.__hunter.stateRef.current).toBe('start')
+  })
+
+  it('a hidden round never reaches a giant dtSeconds frame on return (A2 backstop holds end-to-end)', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    await waitFor(() => expect(window.__hunter.stateRef.current).toBe('playing'))
+    const timeBeforeHide = window.__hunter.timeLeftRef.current
+
+    act(() => setHidden(true))
+    expect(window.__hunter.stateRef.current).toBe('paused')
+
+    // Simulate a long real-world gap while hidden, then return and resume.
+    act(() => setHidden(false))
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    await waitFor(() => expect(window.__hunter.stateRef.current).toBe('playing'))
+    act(() => rafSpy.fire(1000 + 30000)) // a huge stamp gap, as if 30s passed while hidden
+
+    // The clock lost at most the defensive dtSeconds clamp's worth of time,
+    // not the full simulated 30s gap — because the round was paused (and the
+    // loop's own lastRef reset by start()) rather than charged wall-clock.
+    expect(timeBeforeHide - window.__hunter.timeLeftRef.current).toBeLessThan(1)
+  })
+})

@@ -77,7 +77,10 @@ export const HITBOX_RADIUS = 12 // px — fish catch detection
 //     Direction + speed both come from stick displacement. ---
 export const SHARK_OFFSET_MOBILE = 80 // px above touch point (legacy; pre-joystick)
 export const JOYSTICK_RADIUS = 60 // px — max knob displacement from base center (= full speed)
-export const JOYSTICK_MARGIN = 40 // px — gap from left/bottom edge to the base ring (was 20)
+// 48 (was 40, originally 20): activation circle (JOYSTICK_BASE_X/Y - JOYSTICK_ACTIVATE_RADIUS)
+// must clear Android's ~20-24dp gesture-nav edge exclusion (ROADMAP.md B9) with
+// a small buffer — 48 gives 28px, a small tuning shift rather than a relocation.
+export const JOYSTICK_MARGIN = 48 // px — gap from left/bottom edge to the base ring
 // Base center offset from the left edge / bottom edge. Renderer and useInput
 // both derive the center from these, so they can never drift apart.
 export const JOYSTICK_BASE_X = JOYSTICK_MARGIN + JOYSTICK_RADIUS // px from left edge to center

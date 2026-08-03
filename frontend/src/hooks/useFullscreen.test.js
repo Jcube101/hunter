@@ -88,6 +88,41 @@ describe('useFullscreen — exit()', () => {
     })
     expect(exitFullscreen).not.toHaveBeenCalled()
   })
+
+  // ROADMAP.md B11: Chrome releases the orientation lock implicitly when
+  // fullscreen ends, but that's not guaranteed — exit() should release it
+  // explicitly so a standalone PWA session (Finding 0) can't leave landscape
+  // pinned outside gameplay.
+  it('releases the orientation lock', async () => {
+    const { unlock } = installOrientationStub()
+    Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true })
+    const { result } = renderHook(() => useFullscreen(() => {}))
+    await act(async () => {
+      await result.current.exit()
+    })
+    expect(unlock).toHaveBeenCalled()
+  })
+
+  it('swallows an orientation.unlock rejection without throwing', async () => {
+    installOrientationStub({ unlockResolves: false })
+    Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true })
+    const { result } = renderHook(() => useFullscreen(() => {}))
+    await expect(
+      act(async () => {
+        await result.current.exit()
+      }),
+    ).resolves.not.toThrow()
+  })
+
+  it('does not throw when the orientation API is entirely absent', async () => {
+    Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true })
+    const { result } = renderHook(() => useFullscreen(() => {}))
+    await expect(
+      act(async () => {
+        await result.current.exit()
+      }),
+    ).resolves.not.toThrow()
+  })
 })
 
 describe('useFullscreen — fullscreenchange', () => {

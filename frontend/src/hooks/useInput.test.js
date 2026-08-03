@@ -10,6 +10,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useInput } from './useInput.js'
+import { installVisibilityStub } from '../test/deviceStubs.js'
 import {
   JOYSTICK_BASE_X,
   JOYSTICK_BASE_Y,
@@ -61,8 +62,8 @@ describe('useInput — mouse (desktop)', () => {
 
 describe('useInput — joystick (mobile)', () => {
   const rect = { left: 0, top: 0, width: 800, height: 600 }
-  const baseX = JOYSTICK_BASE_X // 100
-  const baseY = rect.height - JOYSTICK_BASE_Y // 500
+  const baseX = JOYSTICK_BASE_X // 108 (Session 23: JOYSTICK_MARGIN 40 -> 48, B9)
+  const baseY = rect.height - JOYSTICK_BASE_Y // 492
 
   it('grabs the stick when a touch lands within the activation zone', () => {
     const canvas = makeCanvas(rect)
@@ -172,6 +173,92 @@ describe('useInput — joystick (mobile)', () => {
     const preventMove = vi.spyOn(moveEvent, 'preventDefault')
     act(() => canvas.dispatchEvent(moveEvent))
     expect(preventMove).toHaveBeenCalled()
+  })
+
+  // ROADMAP.md B8: an interrupted drag can leave inputPosRef stuck at a
+  // stale non-zero vector if the interruption never delivers a touchend. A
+  // real touchcancel (e.g. the OS reclaiming the gesture) should clear it
+  // exactly like touchend does.
+  it('touchcancel from the owning finger clears the stick like touchend', () => {
+    const canvas = makeCanvas(rect)
+    const canvasRef = { current: canvas }
+    const { result } = renderHook(() => useInput(canvasRef, { current: null }))
+
+    act(() => {
+      canvas.dispatchEvent(
+        touchEvent('touchstart', [{ identifier: 1, clientX: baseX + 10, clientY: baseY }]),
+      )
+    })
+    expect(result.current.joystickRef.current.active).toBe(true)
+
+    act(() => {
+      canvas.dispatchEvent(touchEvent('touchcancel', [{ identifier: 1, clientX: 0, clientY: 0 }]))
+    })
+    expect(result.current.joystickRef.current).toEqual({ active: false, dx: 0, dy: 0 })
+    expect(result.current.inputPosRef.current).toEqual({ dx: 0, dy: 0, isJoystick: true })
+  })
+
+  // Interruptions that strand the vector without ANY touch event reaching the
+  // canvas — app switch, notification shade, incoming call, screen off. These
+  // fire visibilitychange/blur, not touchend/touchcancel (ROADMAP.md B8).
+  it('a stale joystick vector is cleared on visibilitychange -> hidden, without a matching touchend', () => {
+    const canvas = makeCanvas(rect)
+    const canvasRef = { current: canvas }
+    const { result } = renderHook(() => useInput(canvasRef, { current: null }))
+
+    act(() => {
+      canvas.dispatchEvent(
+        touchEvent('touchstart', [{ identifier: 1, clientX: baseX + 40, clientY: baseY }]),
+      )
+    })
+    expect(result.current.joystickRef.current.active).toBe(true)
+    expect(result.current.inputPosRef.current.dx).not.toBe(0)
+
+    const visibility = installVisibilityStub()
+    act(() => visibility.setHidden(true))
+    expect(result.current.joystickRef.current).toEqual({ active: false, dx: 0, dy: 0 })
+    expect(result.current.inputPosRef.current).toBeNull()
+
+    // A finger still down when hidden must not be able to resume the stale
+    // drag — the owning touch id was released too.
+    act(() => {
+      canvas.dispatchEvent(
+        touchEvent('touchmove', [{ identifier: 1, clientX: baseX + 40, clientY: baseY }]),
+      )
+    })
+    expect(result.current.joystickRef.current.active).toBe(false)
+  })
+
+  it('a stale joystick vector is also cleared on window blur', () => {
+    const canvas = makeCanvas(rect)
+    const canvasRef = { current: canvas }
+    const { result } = renderHook(() => useInput(canvasRef, { current: null }))
+
+    act(() => {
+      canvas.dispatchEvent(
+        touchEvent('touchstart', [{ identifier: 1, clientX: baseX + 40, clientY: baseY }]),
+      )
+    })
+    expect(result.current.joystickRef.current.active).toBe(true)
+
+    act(() => window.dispatchEvent(new Event('blur')))
+    expect(result.current.joystickRef.current).toEqual({ active: false, dx: 0, dy: 0 })
+    expect(result.current.inputPosRef.current).toBeNull()
+  })
+
+  it('a stale mouse target is also cleared on visibilitychange -> hidden', () => {
+    const canvas = makeCanvas(rect)
+    const canvasRef = { current: canvas }
+    const { result } = renderHook(() => useInput(canvasRef, { current: null }))
+
+    act(() => {
+      canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 50, clientY: 60, bubbles: true }))
+    })
+    expect(result.current.inputPosRef.current).toEqual({ x: 50, y: 60 })
+
+    const visibility = installVisibilityStub()
+    act(() => visibility.setHidden(true))
+    expect(result.current.inputPosRef.current).toBeNull()
   })
 })
 

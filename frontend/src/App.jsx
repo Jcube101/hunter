@@ -342,6 +342,26 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Pause on visibilitychange, independent of the fullscreen-exit pause above
+  // (ROADMAP.md O21/A2). The fullscreen path is the only mobile pause trigger
+  // today, and it depends on the back/app-switch gesture firing
+  // `fullscreenchange` — true in a browser tab, not guaranteed in a real
+  // `standalone` PWA session where the app may already be fullscreen or the
+  // gesture may background it directly. visibilitychange fires either way, so
+  // this is a second, independent path to the same pauseGame(), not a
+  // replacement — whichever fires first wins; the other is then a no-op
+  // (pauseGame only acts while stateRef.current === 'playing'). It also
+  // shrinks A2's exposure: if the round is paused before a giant frame gap
+  // can occur, the dtSeconds clamp (useGameLoop.js) never needs to fire.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.hidden && stateRef.current === 'playing') pauseGame()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Re-apply HiDPI sizing when the viewport changes (incl. entering/exiting
   // fullscreen). World dimensions stay fixed (GDD.md) — only the backing store
   // and the CSS-pixel viewport used by the camera are refreshed (Fix 2).

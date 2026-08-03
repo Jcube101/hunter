@@ -97,27 +97,18 @@ describe('useGameLoop', () => {
   // ROADMAP.md Session 19 addendum A1/A13: the test above only ever
   // destructured `dt` (motion), never the second argument, `dtSeconds` (wall
   // clock, used to decrement the round timer — App.jsx). That blind spot let
-  // a real bug hide behind a green "spiral-of-death guard" test: dtSeconds is
-  // NOT capped, so a 5-second stall (backgrounding the tab, an interruption)
-  // charges the FULL 5 seconds to the round clock in a single frame. This
-  // test pins that current, actual behavior — it passes today, and it is the
-  // bug the next test targets, not a spec to preserve.
-  it('documents current behavior: dtSeconds is uncapped after a long stall and equals the full gap (5s) — this is the round-clock bug from ROADMAP A2, not intended behavior', () => {
-    const update = vi.fn()
-    const { result } = renderHook(() => useGameLoop(update, () => {}))
-    act(() => result.current.start())
-    act(() => rafSpy.fire(1000))
-    act(() => rafSpy.fire(1000 + 5000))
-    const [, dtSeconds] = update.mock.calls[1]
-    expect(dtSeconds).toBe(5)
-  })
+  // a real bug hide behind a green "spiral-of-death guard" test: dtSeconds
+  // was NOT capped, so a 5-second stall (backgrounding the tab, an
+  // interruption) charged the FULL 5 seconds to the round clock in a single
+  // frame. Fixed in Session 23 (ROADMAP A2) — see the clamp test below. This
+  // test previously pinned the uncapped 5.0s behavior; that job is done now
+  // that the clamp exists, so it was replaced rather than kept as dead
+  // documentation.
 
-  // Intended behavior (ROADMAP A2): a defensive dtSeconds clamp so a single
-  // frame can never consume more than a small slice of the round timer, even
-  // if the visibilitychange-pause fix is somehow bypassed. Expected to FAIL
-  // until that clamp lands (Phase 2) — this is the known-red test the phase
-  // exists to introduce, not a broken assertion.
-  it('[Phase 2] clamps dtSeconds after a long stall so a single interruption cannot burn most of the round timer', () => {
+  // ROADMAP A2: a defensive dtSeconds clamp so a single frame can never
+  // consume more than a small slice of the round timer, even if the
+  // visibilitychange-pause fix (App.jsx, Session 23) is somehow bypassed.
+  it('clamps dtSeconds after a long stall so a single interruption cannot burn most of the round timer', () => {
     const update = vi.fn()
     const { result } = renderHook(() => useGameLoop(update, () => {}))
     act(() => result.current.start())

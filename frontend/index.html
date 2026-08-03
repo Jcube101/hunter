@@ -7,10 +7,10 @@
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <meta name="theme-color" content="#0a1628" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
-    />
+    <!-- No maximum-scale/user-scalable (ROADMAP.md B13): blocking pinch-zoom is a
+         WCAG 1.4.4 failure, and redundant since the canvas already sets
+         touch-action: none in index.css. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Hunter</title>
   </head>
   <body>

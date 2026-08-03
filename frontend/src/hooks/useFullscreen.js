@@ -38,6 +38,17 @@ export function useFullscreen(onExit) {
     } catch {
       // Already out of fullscreen or unsupported — ignore.
     }
+    try {
+      // Chrome releases the lock implicitly when fullscreen ends, but that's
+      // not guaranteed (fullscreen was never entered, or refused) — release
+      // explicitly so a standalone PWA session can't leave landscape pinned
+      // outside gameplay (ROADMAP.md B11).
+      if (window.screen?.orientation?.unlock) {
+        await window.screen.orientation.unlock()
+      }
+    } catch {
+      // Unlock unavailable — ignore.
+    }
   }, [])
 
   useEffect(() => {

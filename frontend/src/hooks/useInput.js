@@ -111,11 +111,29 @@ export function useInput(canvasRef, cameraRef) {
       }
     }
 
+    // An interrupted drag (call, notification shade, app switch, screen off)
+    // may never deliver touchend/touchcancel, leaving inputPosRef stuck at
+    // its last non-zero vector — the shark then drives itself on return with
+    // no finger on the screen (ROADMAP.md B8). visibilitychange/blur are the
+    // events that reliably fire across all of those interruption paths, so
+    // strand-proofing lives here rather than trying to enumerate every
+    // possible interruption source.
+    const onStrand = () => {
+      touchIdRef.current = null
+      joystickRef.current = { active: false, dx: 0, dy: 0 }
+      inputPosRef.current = null
+    }
+    const onVisibilityChange = () => {
+      if (document.hidden) onStrand()
+    }
+
     canvas.addEventListener('mousemove', onMouseMove)
     canvas.addEventListener('touchstart', onTouchStart, { passive: false })
     canvas.addEventListener('touchmove', onTouchMove, { passive: false })
     canvas.addEventListener('touchend', onTouchEnd)
     canvas.addEventListener('touchcancel', onTouchEnd)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('blur', onStrand)
 
     return () => {
       canvas.removeEventListener('mousemove', onMouseMove)
@@ -123,6 +141,8 @@ export function useInput(canvasRef, cameraRef) {
       canvas.removeEventListener('touchmove', onTouchMove)
       canvas.removeEventListener('touchend', onTouchEnd)
       canvas.removeEventListener('touchcancel', onTouchEnd)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('blur', onStrand)
     }
   }, [canvasRef, cameraRef])
 
