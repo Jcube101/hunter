@@ -20,6 +20,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import App from './App.jsx'
+import { MAX_DEVICE_PIXEL_RATIO } from './constants/boids.js'
 
 function makeFakeCtx() {
   return new Proxy(
@@ -213,5 +214,57 @@ describe('App — visibilitychange pauses an in-progress round (O21/A2)', () => 
     // not the full simulated 30s gap — because the round was paused (and the
     // loop's own lastRef reset by start()) rather than charged wall-clock.
     expect(timeBeforeHide - window.__hunter.timeLeftRef.current).toBeLessThan(1)
+  })
+})
+
+// ROADMAP.md O8 — the canvas backing store must not exceed
+// MAX_DEVICE_PIXEL_RATIO regardless of the device's real devicePixelRatio.
+// jsdom has no layout engine (canvas.offsetWidth is always 0), which is
+// exactly why sizeCanvas() falls back to window.innerWidth/innerHeight —
+// that fallback is what makes the backing-store size deterministic and
+// assertable here.
+describe('App — canvas backing store clamps devicePixelRatio (O8)', () => {
+  function setDPR(value) {
+    Object.defineProperty(window, 'devicePixelRatio', { value, configurable: true })
+  }
+
+  function mainCanvas() {
+    // The only canvas with this exact class combination is the always-mounted
+    // main game canvas (App.jsx) — AttractBackground and Minimap use their own,
+    // distinct classes.
+    return [...document.querySelectorAll('canvas')].find(
+      (c) => c.className.includes('inset-0') && c.className.includes('h-full') && c.className.includes('w-full'),
+    )
+  }
+
+  afterEach(() => {
+    setDPR(1)
+  })
+
+  it('clamps a high real DPR (2.75, matching the S23 FE) down to MAX_DEVICE_PIXEL_RATIO', async () => {
+    setDPR(2.75)
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    await waitFor(() => expect(window.__hunter.stateRef.current).toBe('playing'))
+
+    const canvas = mainCanvas()
+    const expectedWidth = Math.round(window.innerWidth * MAX_DEVICE_PIXEL_RATIO)
+    const expectedHeight = Math.round(window.innerHeight * MAX_DEVICE_PIXEL_RATIO)
+    expect(canvas.width).toBe(expectedWidth)
+    expect(canvas.height).toBe(expectedHeight)
+    // Sanity: this is actually a reduction from the unclamped value, not a
+    // no-op — otherwise this test would pass even if the clamp were removed.
+    expect(canvas.width).toBeLessThan(Math.round(window.innerWidth * 2.75))
+  })
+
+  it('does not alter a DPR already at or under the cap (1.5)', async () => {
+    setDPR(1.5)
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+    await waitFor(() => expect(window.__hunter.stateRef.current).toBe('playing'))
+
+    const canvas = mainCanvas()
+    expect(canvas.width).toBe(Math.round(window.innerWidth * 1.5))
+    expect(canvas.height).toBe(Math.round(window.innerHeight * 1.5))
   })
 })

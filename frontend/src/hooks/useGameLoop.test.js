@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useGameLoop } from './useGameLoop.js'
+import { TARGET_FPS } from '../constants/boids.js'
 
 function installRafSpy() {
   let id = 0
@@ -149,5 +150,104 @@ describe('useGameLoop', () => {
     act(() => result.current.start())
     unmount()
     expect(rafSpy.caf).toHaveBeenCalled()
+  })
+
+  // ROADMAP.md O10 — frame cap so a high-refresh display doesn't run the
+  // simulation/repaint twice as often for no gameplay benefit.
+  describe('frame cap (TARGET_FPS, ROADMAP.md O10)', () => {
+    const FRAME_MS_120HZ = 1000 / 120
+    const FRAME_MS_60HZ = 1000 / TARGET_FPS
+
+    it('skips update/draw for a native frame that arrives well under the target interval (120Hz)', () => {
+      const update = vi.fn()
+      const draw = vi.fn()
+      const { result } = renderHook(() => useGameLoop(update, draw))
+      act(() => result.current.start())
+      act(() => rafSpy.fire(1000)) // first frame always runs
+      expect(update).toHaveBeenCalledTimes(1)
+
+      act(() => rafSpy.fire(1000 + FRAME_MS_120HZ)) // ~8.3ms later — too soon
+      expect(update).toHaveBeenCalledTimes(1) // skipped
+      expect(draw).toHaveBeenCalledTimes(1) // draw also skipped
+      expect(rafSpy.pendingCount()).toBe(1) // still rescheduled, not stalled
+    })
+
+    it('does not skip a native frame that arrives at (or just under) the target interval (60Hz)', () => {
+      const update = vi.fn()
+      const { result } = renderHook(() => useGameLoop(update, () => {}))
+      act(() => result.current.start())
+      act(() => rafSpy.fire(1000))
+      act(() => rafSpy.fire(1000 + FRAME_MS_60HZ)) // ~16.67ms later
+      expect(update).toHaveBeenCalledTimes(2) // not skipped
+    })
+
+    it('carries a skipped frame\'s elapsed time forward instead of dropping it', () => {
+      const update = vi.fn()
+      const { result } = renderHook(() => useGameLoop(update, () => {}))
+      act(() => result.current.start())
+      act(() => rafSpy.fire(1000)) // frame 1: processed, lastRef = 1000
+
+      // Two native 120Hz ticks arrive before a full 60fps interval has
+      // passed; both are skipped.
+      act(() => rafSpy.fire(1000 + FRAME_MS_120HZ)) // 1008.3 — skipped
+      act(() => rafSpy.fire(1000 + FRAME_MS_120HZ * 2)) // 1016.7 — processed
+      expect(update).toHaveBeenCalledTimes(2)
+      const [dt] = update.mock.calls[1]
+      // The processed frame's dt reflects the FULL gap since frame 1
+      // (~16.7ms, dt≈1), not just the gap since the last (skipped) tick
+      // (~8.3ms, which would give dt≈0.5 and silently lose half a frame of
+      // motion/timer on every skip).
+      expect(dt).toBeCloseTo(1, 1)
+    })
+
+    it('produces the same total update() count and total dt/dtSeconds over a fixed wall-clock duration at 60Hz and at 120Hz', () => {
+      // Simulates a 2-second round-clock window at each native refresh rate
+      // and sums what the loop actually delivered to update(). This is the
+      // property that matters for gameplay: a 120Hz player and a 60Hz player
+      // must experience the same round length and the same total motion,
+      // not just "some cap is applied."
+      function simulate(nativeFrameMs, durationMs) {
+        const localRaf = installRafSpy()
+        vi.stubGlobal('requestAnimationFrame', localRaf.raf)
+        vi.stubGlobal('cancelAnimationFrame', localRaf.caf)
+        const calls = []
+        const { result } = renderHook(() => useGameLoop((dt, dtSeconds) => calls.push([dt, dtSeconds]), () => {}))
+        act(() => result.current.start())
+        // Start well above 0 — a real rAF timestamp is time-since-page-load
+        // and is never exactly 0 for a game loop's frames in practice; 0
+        // would collide with lastRef's "no prior frame yet" falsy sentinel
+        // on what should be treated as an ordinary subsequent frame.
+        let now = 1000
+        const start = now
+        act(() => localRaf.fire(now)) // first frame
+        while (now < start + durationMs) {
+          now += nativeFrameMs
+          act(() => localRaf.fire(now))
+        }
+        return calls
+      }
+
+      const calls60 = simulate(FRAME_MS_60HZ, 2000)
+      const calls120 = simulate(FRAME_MS_120HZ, 2000)
+
+      const sum = (calls, i) => calls.reduce((acc, c) => acc + c[i], 0)
+      const totalDt60 = sum(calls60, 0)
+      const totalDt120 = sum(calls120, 0)
+      const totalDtSeconds60 = sum(calls60, 1)
+      const totalDtSeconds120 = sum(calls120, 1)
+
+      // Same round-clock decrement either way (this is the A2/O10 timer
+      // integrity property): total wall-clock time delivered to the timer
+      // matches within a fraction of a frame interval.
+      expect(totalDtSeconds120).toBeCloseTo(totalDtSeconds60, 0)
+      // Same total motion either way: dt is frame-normalized (~1 per 1/60s
+      // of real time), so the sums should match within roughly one frame's
+      // worth of dt, not diverge by the ~2x a naive uncapped 120Hz loop
+      // would produce.
+      expect(Math.abs(totalDt120 - totalDt60)).toBeLessThan(2)
+      // And update() itself ran roughly the same number of times at both
+      // rates (~60/sec), not twice as often at 120Hz.
+      expect(Math.abs(calls120.length - calls60.length)).toBeLessThanOrEqual(2)
+    })
   })
 })

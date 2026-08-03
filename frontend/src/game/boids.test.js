@@ -14,8 +14,10 @@ import {
   anchorForce,
   updateFish,
   updateSchool,
+  updateSchoolInto,
   initFish,
 } from './boids.js'
+import { stepPredator } from './predator.js'
 import {
   FISH_BASE_SPEED,
   FISH_FLEE_SPEED,
@@ -431,5 +433,81 @@ describe('initFish', () => {
 
   it('returns an empty array for count=0', () => {
     expect(initFish(0, world)).toEqual([])
+  })
+})
+
+// --- O11 equivalence proof (ROADMAP.md O11) ---------------------------------
+//
+// updateSchoolInto exists purely as a lower-allocation path for the hot loop
+// (see boids.js's header comment on it and useBoids.js). This is not "tests
+// pass" — it is an actual trajectory comparison: two independent simulations,
+// starting from an IDENTICAL cloned initial state and driven by an IDENTICAL
+// scripted predator-input and dt sequence, one using the pure map-based path
+// this whole file already tests, the other using the buffer-reusing path.
+// Every fish's x/y/vx/vy is compared at checkpoints across several hundred
+// ticks, not just at the end, so a divergence that self-corrects (or one that
+// only shows up transiently) can't hide. Equality is exact (not tolerance) —
+// both paths run the identical arithmetic in the identical order (updateFish
+// and updateFishInto are the same expressions, only differing in whether the
+// result is returned as a new object or written into `out`), so floating
+// point should produce bit-identical results, not merely close ones; asserting
+// exact equality is what would actually catch a subtle reordering bug.
+describe('updateSchoolInto — equivalence with updateSchool (O11 proof)', () => {
+  it('produces identical fish trajectories to the pure updateSchool over 500 ticks of scripted, varying predator movement and dt', () => {
+    const world = { width: 2000, height: 1500 }
+    const seedFish = initFish(50, world)
+
+    let pureFish = seedFish.map((f) => ({ ...f }))
+    let optFish = seedFish.map((f) => ({ ...f }))
+    let optBuffer = optFish.map(() => ({ x: 0, y: 0, vx: 0, vy: 0 }))
+
+    let purePredator = { x: world.width / 2, y: world.height / 2, vx: 0, vy: 0, angle: 0 }
+    let optPredator = { x: world.width / 2, y: world.height / 2, vx: 0, vy: 0, angle: 0 }
+
+    const TICKS = 500
+    const CHECK_EVERY = 25
+
+    for (let t = 0; t < TICKS; t++) {
+      // Deterministic scripted input (no Math.random) — a joystick vector
+      // that sweeps direction over time, so the predator's path (and thus
+      // which forces dominate for which fish) varies across the run instead
+      // of settling into one static configuration.
+      const angle = (t / TICKS) * Math.PI * 6
+      const input = { dx: Math.cos(angle), dy: Math.sin(angle), isJoystick: true }
+      // Varying dt exercises the frame-rate-independence path identically on
+      // both sides too, not just a fixed dt=1.
+      const dt = 1 + 0.4 * Math.sin(t * 0.31)
+
+      purePredator = stepPredator(purePredator, input, world, dt)
+      optPredator = stepPredator(optPredator, input, world, dt)
+
+      pureFish = updateSchool(pureFish, purePredator, world, dt)
+      updateSchoolInto(optBuffer, optFish, optPredator, world, dt)
+      const swap = optFish
+      optFish = optBuffer
+      optBuffer = swap
+
+      if (t % CHECK_EVERY === 0 || t === TICKS - 1) {
+        expect(optPredator).toEqual(purePredator)
+        for (let i = 0; i < pureFish.length; i++) {
+          expect(optFish[i].x, `fish[${i}].x at tick ${t}`).toBe(pureFish[i].x)
+          expect(optFish[i].y, `fish[${i}].y at tick ${t}`).toBe(pureFish[i].y)
+          expect(optFish[i].vx, `fish[${i}].vx at tick ${t}`).toBe(pureFish[i].vx)
+          expect(optFish[i].vy, `fish[${i}].vy at tick ${t}`).toBe(pureFish[i].vy)
+        }
+      }
+    }
+  })
+
+  it('does not mutate the fish array passed in as `fish` (only writes into `next`)', () => {
+    const world = { width: 1000, height: 1000 }
+    const fish = [
+      { x: 495, y: 500, vx: 0, vy: 0 },
+      { x: 505, y: 500, vx: 0, vy: 0 },
+    ]
+    const snapshot = fish.map((f) => ({ ...f }))
+    const next = fish.map(() => ({ x: 0, y: 0, vx: 0, vy: 0 }))
+    updateSchoolInto(next, fish, null, world, 1)
+    expect(fish).toEqual(snapshot)
   })
 })

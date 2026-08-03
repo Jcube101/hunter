@@ -3,7 +3,6 @@
 // Particles live in WORLD coordinates and are drawn through the camera, so a
 // burst stays anchored to where the fish was caught even as the camera moves.
 
-import { worldToScreen } from './camera.js'
 import { theme } from '../constants/theme.js'
 
 const MIN_PARTICLES = 8
@@ -55,13 +54,44 @@ export function updateParticles(particles, dt = 1) {
   return next
 }
 
+// In-place variant for the hot loop (ROADMAP.md O11). updateParticles above
+// stays pure/unchanged (the tests depend on that, and spawnParticles already
+// only allocates on a catch — an infrequent event, not a steady per-frame
+// cost). This mutates each still-alive particle's fields directly instead of
+// spreading into a new object, and compacts dead ones out via a write-index
+// pass instead of allocating a new array — no allocation at all when nothing
+// died this frame (the common case between catches), and none of the
+// generational-GC churn from the per-frame `next = []` + spread copy either
+// way. Safe to mutate here (unlike boids' allFish): each particle's advance
+// depends only on its own previous state, never on another particle's.
+export function updateParticlesInPlace(particles, dt = 1) {
+  let writeIndex = 0
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i]
+    const life = p.life - 1
+    if (life <= 0) continue
+    p.x = p.x + p.vx * dt
+    p.y = p.y + (p.vy - 0.3) * dt
+    p.vx = p.vx * 0.92
+    p.vy = p.vy * 0.92
+    p.life = life
+    particles[writeIndex] = p
+    writeIndex++
+  }
+  particles.length = writeIndex
+  return particles
+}
+
 // Draw all particles as fading bubbles through the camera transform.
+// worldToScreen (camera.js) is deliberately NOT called here (ROADMAP.md
+// O11) — same inlined-arithmetic reasoning as renderer.js's drawSchool.
 export function drawParticles(ctx, particles, camera) {
   for (const p of particles) {
-    const s = worldToScreen(p.x, p.y, camera)
+    const sx = p.x - camera.x
+    const sy = p.y - camera.y
     const alpha = p.life / p.maxLife
     ctx.beginPath()
-    ctx.arc(s.x, s.y, p.radius, 0, Math.PI * 2)
+    ctx.arc(sx, sy, p.radius, 0, Math.PI * 2)
     ctx.fillStyle = theme.particle.color
     ctx.globalAlpha = alpha
     ctx.fill()

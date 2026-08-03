@@ -214,6 +214,73 @@ export function updateSchool(
   return fish.map((f) => updateFish(f, fish, predator, world, dt, fleeWeight, fleeRadius))
 }
 
+// --- Buffer-reusing variants for the hot loop (ROADMAP.md O11) -------------
+//
+// updateFish/updateSchool above stay untouched and fully pure — they're the
+// contract the unit tests (and this module's own reasoning) depend on, and
+// nothing about that changes. updateFishInto/updateSchoolInto below compute
+// the EXACT SAME arithmetic (copy-identical to updateFish's body — separation
+// through the hard positional clamp) but write into a caller-supplied `out`
+// object/array instead of allocating a new one, so a caller that reuses the
+// same buffer across ticks (see useBoids.js) avoids a full fish array plus
+// one object per fish, every tick.
+//
+// Safety-critical constraint: `out` must never be (or alias) an element of
+// `fish`/`allFish`. Every per-fish force function reads the WHOLE `allFish`
+// array as this tick's snapshot, so if fish[i]'s result were written back
+// into fish[i] before fish[i+1..] finish reading it, later fish in the same
+// pass would react to an already-updated neighbor instead of the pre-tick
+// position — a real, order-dependent simulation bug, not just a style
+// concern. updateSchoolInto enforces this by construction: `next` is always
+// a separate array from `fish` (double-buffered by the caller), so `out`
+// (an element of `next`) can never coincide with any element of `fish`.
+export function updateFishInto(out, fish, allFish, predator, world, dt = 1, fleeWeight = FLEE_WEIGHT, fleeRadius = FLEE_RADIUS) {
+  const sep = separation(fish, allFish, SEPARATION_RADIUS, SEPARATION_WEIGHT)
+  const ali = alignment(fish, allFish, ALIGNMENT_RADIUS, ALIGNMENT_WEIGHT)
+  const coh = cohesion(fish, allFish, COHESION_RADIUS, COHESION_WEIGHT)
+  const fle = flee(fish, predator, fleeRadius, fleeWeight)
+  const edge = edgeRepulsion(fish, world, EDGE_REPULSION_RADIUS, EDGE_REPULSION_WEIGHT)
+  const anc = anchorForce(fish, world, ANCHOR_WEIGHT)
+
+  let vx = fish.vx + sep.x + ali.x + coh.x + fle.x + edge.x + anc.x
+  let vy = fish.vy + sep.y + ali.y + coh.y + fle.y + edge.y + anc.y
+
+  const clamped = clampMagnitude(vx, vy, maxSpeedFor(fish, predator, fleeRadius))
+  vx = clamped.x
+  vy = clamped.y
+
+  let nx = fish.x + vx * dt
+  let ny = fish.y + vy * dt
+
+  if (nx < 0) { nx = 0; vx = 0 } else if (nx > world.width) { nx = world.width; vx = 0 }
+  if (ny < 0) { ny = 0; vy = 0 } else if (ny > world.height) { ny = world.height; vy = 0 }
+
+  out.x = nx
+  out.y = ny
+  out.vx = vx
+  out.vy = vy
+  return out
+}
+
+// `next` must be a same-length array of plain {x,y,vx,vy} objects, DISTINCT
+// from `fish` (see the safety note above) — useBoids.js maintains this via
+// double-buffering (ping-ponging two arrays, only reallocating either when
+// the school's length changes, i.e. on a catch).
+export function updateSchoolInto(
+  next,
+  fish,
+  predator,
+  world,
+  dt = 1,
+  fleeWeight = FLEE_WEIGHT,
+  fleeRadius = FLEE_RADIUS,
+) {
+  for (let i = 0; i < fish.length; i++) {
+    updateFishInto(next[i], fish[i], fish, predator, world, dt, fleeWeight, fleeRadius)
+  }
+  return next
+}
+
 // --- Spawning ---------------------------------------------------------------
 
 // Spawn `count` fish clustered near world center with randomised velocities

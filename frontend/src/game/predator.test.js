@@ -3,7 +3,7 @@
 // resolveCatches (catch detection). Same math as the original inline closures.
 
 import { describe, it, expect } from 'vitest'
-import { stepPredator, resolveCatches } from './predator.js'
+import { stepPredator, stepPredatorInto, resolveCatches } from './predator.js'
 import { SHARK_SPEED, SHARK_MOUTH_OFFSET, HITBOX_RADIUS } from '../constants/boids.js'
 
 describe('stepPredator', () => {
@@ -84,6 +84,52 @@ describe('stepPredator', () => {
     const result = stepPredator(predator, { x: 600, y: 500 }, world, 1)
     expect(result).not.toBe(predator)
     expect(predator).toEqual(snapshot)
+  })
+})
+
+// --- O11 equivalence proof (ROADMAP.md O11) ---------------------------------
+// stepPredatorInto exists purely as a lower-allocation path for App.jsx's
+// hot loop (mutates predatorRef.current in place). Same arithmetic as
+// stepPredator, copy-identical — this is an actual trajectory comparison
+// across a scripted mixed mouse/joystick input sequence and varying dt, not
+// just "tests pass". Exact equality: identical expressions in identical
+// order should produce bit-identical floats.
+describe('stepPredatorInto — equivalence with stepPredator (O11 proof)', () => {
+  it('produces an identical trajectory to stepPredator over 500 ticks of scripted, varying input and dt', () => {
+    const world = { width: 2000, height: 1500 }
+    let pure = { x: 1000, y: 750, vx: 0, vy: 0, angle: 0 }
+    let opt = { x: 1000, y: 750, vx: 0, vy: 0, angle: 0 }
+
+    for (let t = 0; t < 500; t++) {
+      // Alternate mouse-style and joystick-style input across the run, both
+      // driven by the same deterministic scripted sequence, so both movement
+      // branches (and the hard-stop-at-bounds branch, since the sweep pushes
+      // near the edges) get exercised identically on both sides.
+      const angle = (t / 500) * Math.PI * 8
+      const input =
+        t % 2 === 0
+          ? { x: 1000 + Math.cos(angle) * 1200, y: 750 + Math.sin(angle) * 900 }
+          : { dx: Math.cos(angle), dy: Math.sin(angle), isJoystick: true }
+      const dt = 1 + 0.4 * Math.sin(t * 0.31)
+
+      pure = stepPredator(pure, input, world, dt)
+      opt = stepPredatorInto(opt, opt, input, world, dt)
+
+      expect(opt.x, `x at tick ${t}`).toBe(pure.x)
+      expect(opt.y, `y at tick ${t}`).toBe(pure.y)
+      expect(opt.vx, `vx at tick ${t}`).toBe(pure.vx)
+      expect(opt.vy, `vy at tick ${t}`).toBe(pure.vy)
+      expect(opt.angle, `angle at tick ${t}`).toBe(pure.angle)
+    }
+  })
+
+  it('writes into a distinct `out` object without requiring out === predator', () => {
+    const world = { width: 1000, height: 1000 }
+    const predator = { x: 500, y: 500, vx: 0, vy: 0, angle: 0 }
+    const out = { x: 0, y: 0, vx: 0, vy: 0, angle: 0 }
+    const result = stepPredatorInto(out, predator, { x: 600, y: 500 }, world, 1)
+    expect(result).toBe(out)
+    expect(predator).toEqual({ x: 500, y: 500, vx: 0, vy: 0, angle: 0 }) // input untouched
   })
 })
 

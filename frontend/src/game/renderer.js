@@ -4,7 +4,11 @@
 // World entities (fish, shark, particles) are drawn through the camera via
 // worldToScreen. The minimap is drawn on its own separate canvas.
 
-import { worldToScreen } from './camera.js'
+// worldToScreen (camera.js) is deliberately NOT called in the per-fish loop
+// below (ROADMAP.md O11): its whole body is `x: worldX - camera.x, y:
+// worldY - camera.y`, so drawSchool inlines that same arithmetic as two
+// scalars instead of allocating a {x,y} object per fish per draw frame. Any
+// change to camera.js's transform math must be mirrored here.
 // No boids constants needed here: the shark nose is authored at local x = 28
 // (= SHARK_MOUTH_OFFSET) and colours are literals. The joystick is intentionally
 // invisible (Session 8) — no joystick drawing.
@@ -84,11 +88,12 @@ export function drawFish(ctx, x, y, angle, isFleeing, glow = true) {
 export function drawSchool(ctx, fishList, camera, predator, detectRadius) {
   const fr2 = detectRadius * detectRadius
   for (const fish of fishList) {
-    const s = worldToScreen(fish.x, fish.y, camera)
+    const sx = fish.x - camera.x
+    const sy = fish.y - camera.y
     const dx = fish.x - predator.x
     const dy = fish.y - predator.y
     const isFleeing = dx * dx + dy * dy < fr2
-    drawFish(ctx, s.x, s.y, headingOf(fish), isFleeing) // glow always on when fleeing
+    drawFish(ctx, sx, sy, headingOf(fish), isFleeing) // glow always on when fleeing
   }
 }
 

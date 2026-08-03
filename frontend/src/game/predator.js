@@ -50,6 +50,49 @@ export function stepPredator(predator, input, world, dt) {
   return { x: nx, y: ny, vx, vy, angle }
 }
 
+// Buffer-reusing variant for the hot loop (ROADMAP.md O11). stepPredator
+// above stays pure/unchanged (the tests depend on that). Same arithmetic,
+// copy-identical to stepPredator's body, written into `out` instead of a
+// fresh object — avoids one allocation per frame. `out` may safely be the
+// SAME object as `predator` (unlike updateFishInto/allFish, nothing here
+// reads a snapshot of other entities mid-computation), so App.jsx mutates
+// predatorRef.current in place rather than double-buffering.
+export function stepPredatorInto(out, predator, input, world, dt) {
+  const p = predator
+
+  let vx = 0
+  let vy = 0
+  if (input && input.isJoystick) {
+    vx = input.dx * SHARK_SPEED * dt
+    vy = input.dy * SHARK_SPEED * dt
+  } else {
+    const target = input || { x: p.x, y: p.y }
+    const dx = target.x - p.x
+    const dy = target.y - p.y
+    const dist = Math.hypot(dx, dy)
+    if (dist > 0) {
+      const step = Math.min(SHARK_SPEED * dt, dist)
+      vx = (dx / dist) * step
+      vy = (dy / dist) * step
+    }
+  }
+
+  let nx = p.x + vx
+  let ny = p.y + vy
+  if (nx < 0) { nx = 0; vx = 0 } else if (nx > world.width) { nx = world.width; vx = 0 }
+  if (ny < 0) { ny = 0; vy = 0 } else if (ny > world.height) { ny = world.height; vy = 0 }
+
+  let angle = p.angle
+  if (Math.hypot(vx, vy) > ROTATION_VELOCITY_THRESHOLD) angle = Math.atan2(vy, vx)
+
+  out.x = nx
+  out.y = ny
+  out.vx = vx
+  out.vy = vy
+  out.angle = angle
+  return out
+}
+
 // Resolve one frame's catch detection: which fish are within HITBOX_RADIUS of
 // the predator's mouth point. Returns { survivors, caught } — `caught` is the
 // list of fish removed this frame (for particle bursts + score), `survivors`

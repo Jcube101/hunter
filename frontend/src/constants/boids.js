@@ -96,6 +96,18 @@ export const WORLD_HEIGHT_MULTIPLIER = 1.2
 export const GAME_DURATION = 60 // seconds
 export const LOW_TIME_THRESHOLD = 10 // seconds — timer turns red
 
+// --- Performance (Session 25 / ROADMAP.md O8, O10) ---
+// The game is flat fills and 1.5px strokes, not fine detail — a DPR above 2
+// buys negligible visual quality for a large pixel-count cost. 2 (down from
+// an unclamped ~2.75 on the S23 FE) cuts backing-store pixel count by ~47%.
+export const MAX_DEVICE_PIXEL_RATIO = 2
+// Frame rate cap for the game loop (useGameLoop.js). Uncapped rAF runs the
+// O(n^2) boids pass and full-canvas repaint at the display's native refresh
+// rate (up to 120Hz on the S23 FE) for no gameplay benefit — dt is already
+// frame-normalized, so motion is correct at any rate. Named so raising it
+// (e.g. to 120 for a future high-refresh preference) is a one-line change.
+export const TARGET_FPS = 60
+
 // --- Derived helpers (not tuning values; convenience only) ---
 export const MOBILE_BREAKPOINT = 768 // px — viewport width boundary for mobile
 export const INITIAL_VELOCITY_RANGE = 1.5 // ±px/frame randomised spawn velocity

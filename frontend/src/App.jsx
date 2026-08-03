@@ -29,8 +29,8 @@ import { useSound } from './hooks/useSound.js'
 
 import { updateCamera, worldToScreen } from './game/camera.js'
 import { drawBackground, drawSchool, drawShark, drawMinimap } from './game/renderer.js'
-import { spawnParticles, updateParticles, drawParticles } from './game/particles.js'
-import { stepPredator, resolveCatches } from './game/predator.js'
+import { spawnParticles, updateParticlesInPlace, drawParticles } from './game/particles.js'
+import { stepPredatorInto, resolveCatches } from './game/predator.js'
 import { isNewPersonalBest } from './utils/personalBest.js'
 import { theme } from './constants/theme.js'
 import {
@@ -45,6 +45,7 @@ import {
   SHAKE_OFFSET,
   MINIMAP_VIEWPORT_FRACTION,
   GRACE_PERIOD,
+  MAX_DEVICE_PIXEL_RATIO,
 } from './constants/boids.js'
 
 const DIFFICULTY_KEY = 'hunter_difficulty'
@@ -138,10 +139,13 @@ export default function App() {
   // Size the main canvas backing store for HiDPI: CSS pixels * devicePixelRatio.
   // The 2D context is scaled (in onFrameDraw) so all drawing + game coordinates
   // stay in CSS pixels. Re-run on init and on any resize / fullscreen change.
+  // DPR is clamped (ROADMAP.md O8) — the art is flat fills, not fine detail,
+  // so a DPR above MAX_DEVICE_PIXEL_RATIO buys negligible visual quality for
+  // a large pixel-count cost on high-DPR phones.
   const sizeCanvas = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const dpr = window.devicePixelRatio || 1
+    const dpr = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO)
     const cssW = canvas.offsetWidth || window.innerWidth
     const cssH = canvas.offsetHeight || window.innerHeight
     canvas.width = Math.round(cssW * dpr)
@@ -153,13 +157,13 @@ export default function App() {
   // --- Predator movement -----------------------------------------------------
   // Math lives in game/predator.js (extracted Session 18 for unit testing) —
   // this is just ref glue, identical to the previous inline implementation.
+  // Mutates predatorRef.current in place (ROADMAP.md O11) instead of
+  // allocating a new object every frame; safe because nothing reads a
+  // pre-move snapshot of the predator later in the same tick (tickBoids runs
+  // AFTER this and is meant to see the post-move position, exactly as
+  // before, when this replaced predatorRef.current outright).
   const movePredator = useCallback((dt) => {
-    predatorRef.current = stepPredator(
-      predatorRef.current,
-      inputPosRef.current,
-      worldRef.current,
-      dt,
-    )
+    stepPredatorInto(predatorRef.current, predatorRef.current, inputPosRef.current, worldRef.current, dt)
   }, [predatorRef, worldRef, inputPosRef])
 
   // --- Per-frame update ------------------------------------------------------
@@ -186,7 +190,11 @@ export default function App() {
       }
     }
 
-    particlesRef.current = updateParticles(particlesRef.current, dt)
+    // Mutates + compacts particlesRef.current in place (ROADMAP.md O11)
+    // instead of allocating a new array and a spread-copied object per
+    // particle every frame; each particle's advance only reads its own
+    // previous state, so unlike boids there's no snapshot-ordering hazard.
+    updateParticlesInPlace(particlesRef.current, dt)
 
     // Timer uses wall-clock seconds (unchanged). Sync display on second boundaries.
     timeLeftRef.current -= dtSeconds
