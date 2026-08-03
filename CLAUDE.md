@@ -188,6 +188,19 @@ For local dev, the Vite proxy config in vite.config.js points /api → localhost
     wrong produces a bug that an equivalence test running the mutated path
     ALONE won't catch, since the bug is about read ORDER against other
     code, not about the function's own arithmetic.
+- **`AttractBackground.jsx`'s frame-skip logic is a deliberate copy of
+  `useGameLoop.js`'s, not a shared helper** (Session 26, ROADMAP.md O8/O10
+  follow-up). Both clamp to `MAX_DEVICE_PIXEL_RATIO`/`TARGET_FPS`
+  (`constants/boids.js`) and skip processing under the target frame
+  interval the same way, but `AttractBackground` keeps its own separate
+  canvas, state, and `requestAnimationFrame` loop on purpose, per that
+  file's own header comment: it must never couple to the real game's
+  `useGameLoop`/`useBoids`/camera, so a bug in the decorative start-screen
+  simulation can never leak into an actual round. Extracting a shared
+  timing helper would reintroduce exactly that coupling for the sake of a
+  few duplicated lines. If you're touching one loop's frame-cap logic and
+  notice the other could use the same fix, that is not a signal to merge
+  them; update both copies deliberately instead.
 ---
 
 ## Verification Steps (run after every deploy)

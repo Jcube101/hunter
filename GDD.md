@@ -160,27 +160,30 @@ Text: "Rotate your phone for the best experience 🔄"
 
 ---
 
-## Compact Viewport Layout (Session 24)
+## Compact Viewport Layout (Session 24/26)
 
-Every overlay screen adapts to constrained viewport height (landscape on
-phones), via a single shared hook, `useCompactViewport()`
+Every screen adapts to constrained viewport height (landscape on phones),
+via a single shared hook, `useCompactViewport()`
 (`hooks/useCompactViewport.js`). When viewport height < 500px, `isCompact`
 becomes true: title/heading sizes shrink, vertical gaps and padding tighten,
 and each screen's own layout-specific reductions apply (see below).
 Detected via `window.innerHeight` on mount and re-checked on
 resize/orientationchange.
 
-Screens using it: Start Screen, End Screen, Tutorial, and the Leaderboard
-overlay. Pause Screen and Settings do not yet (ROADMAP.md B12, not yet
-implemented). Their content is light enough that it isn't a live clipping
-bug, so this was deliberately left for that finding rather than folded in
-here.
+All six screens use it: Start Screen, End Screen, Tutorial, the
+Leaderboard overlay, Settings, and Pause Screen (the last two added in
+Session 26, closing out ROADMAP.md B12). Settings and Pause Screen already
+fit comfortably under a 393px landscape viewport before that session, so
+wiring the hook in there was consistency and future headroom, not a fix
+for a live clipping bug.
 
 On the Start Screen specifically, compact mode alone is sufficient: all
-elements remain visible without scrolling, no fallback needed. End Screen,
-Tutorial, and the Leaderboard overlay are different: each also gets a
-scroll fallback (see their own sections below) as a safety net, since their
-content is heavier and less bounded.
+elements remain visible without scrolling, no fallback needed. The other
+five screens each also get a scroll fallback (see their own sections
+below) as a safety net, not because it's currently load-bearing on every
+one of them, but for consistency and because content on some of them
+(End Screen, Tutorial, the Leaderboard overlay) is heavier and less
+bounded.
 
 ---
 

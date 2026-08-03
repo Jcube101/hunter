@@ -296,14 +296,16 @@ it.
 
 ### B6. No `overflow`/scroll escape hatch on any overlay screen — [code]
 
-> **Status: Done for EndScreen, Tutorial, and LeaderboardOverlay (Session
-> 24), device-verified on the S23 FE.** EndScreen and Tutorial got the
-> `overflow-y-auto` root plus `min-h-full` centered inner div pattern
-> proposed below, as a fallback net behind compact layout (B1/B5), not the
-> primary fit strategy. LeaderboardOverlay got a variant suited to its
-> heavier content: only the ranked-list region scrolls, with the header and
-> Close pinned outside it (B4). PauseScreen and Settings are not covered
-> (B12, not yet implemented).
+> **Status: Done for all six screens, device-verified on the S23 FE.**
+> EndScreen and Tutorial got the `overflow-y-auto` root plus `min-h-full`
+> centered inner div pattern proposed below (Session 24), as a fallback net
+> behind compact layout (B1/B5), not the primary fit strategy.
+> LeaderboardOverlay got a variant suited to its heavier content (Session
+> 24): only the ranked-list region scrolls, with the header and Close
+> pinned outside it (B4). PauseScreen and Settings got the same
+> `overflow-y-auto`/`min-h-full` pattern as EndScreen/Tutorial in Session
+> 26 (B12): a consistency measure, not a fix, since both already fit
+> without it.
 
 **Where:** systemic. `App.jsx:386` is `overflow-hidden`; `index.css` sets
 `overflow: hidden` on `html, body, #root`; every screen component
@@ -450,6 +452,19 @@ screen and leaderboard to landscape too.
 `"orientation": "landscape"` there and drop the imperative lock.
 
 ### B12. `PauseScreen` has no short-viewport handling and its toggle sits in the unsafe corner — [code]
+
+> **Status: Done (Session 26), device-verified on the S23 FE across both
+> landscape orientations.** Confirmed this section's own read: both
+> `PauseScreen` and `Settings` already fit comfortably under a 393px
+> landscape viewport before this session (computed ~172px and ~224px
+> respectively), so there was no live clipping bug to fix. `useCompactViewport()`
+> was wired into both anyway, with the same light reductions and B6 scroll
+> fallback used elsewhere, for consistency with the other four screens and
+> headroom against future content, not to rescue anything broken.
+> `PauseScreen`'s audio toggle now shares the `--safe-*` inset offset every
+> other corner control uses (B3); `Settings`' close button already had it
+> from Session 24. See SPEC.md "Layout and Safe-Area (Session 24)" and
+> GDD.md "Compact Viewport Layout (Session 24/26)".
 
 **Where:** `frontend/src/components/PauseScreen.jsx:8` (`gap-8`) and `:15`
 (`right-4 top-4`).
@@ -600,10 +615,12 @@ audio/settings preference or its own toggle.
 > at the clamped DPR looked fine, no regressions noticed).** `MAX_DEVICE_PIXEL_RATIO
 > = 2` added to `constants/boids.js` as proposed, applied in `App.jsx`'s
 > `sizeCanvas`. Cuts backing-store pixel count ~47% at DPR 2.75, matching
-> this section's estimate exactly. `AttractBackground.jsx` has the identical
-> unclamped-DPR pattern and was deliberately left untouched: this session
-> was scoped to what this finding names (`App.jsx`), and `AttractBackground`
-> is by design isolated from the real game loop. See SPEC.md "Performance
+> this section's estimate exactly. `AttractBackground.jsx` had the identical
+> unclamped-DPR pattern and was deliberately left untouched this session,
+> scoped to what this finding names (`App.jsx`). Closed in Session 26:
+> `AttractBackground` now reuses the same `MAX_DEVICE_PIXEL_RATIO` constant
+> in its own canvas sizing, still fully isolated from the real game loop
+> (no shared code, just the same constant). See SPEC.md "Performance
 > (Session 25)".
 
 `App.jsx:134` — `const dpr = window.devicePixelRatio || 1`. On the S23 FE
@@ -640,7 +657,12 @@ a proposal to change how glow looks.
 > SPEC.md "Performance (Session 25)" and `useGameLoop.test.js`'s "frame
 > cap" tests, including a simulated 60Hz-vs-120Hz parity check). Simulated
 > over a 2s window: 120Hz native now delivers ~121 update() calls vs ~122
-> at native 60Hz, down from ~240 uncapped.
+> at native 60Hz, down from ~240 uncapped. `AttractBackground.jsx` ran its
+> own uncapped loop too (runs on the start screen, i.e. during idle time
+> before a round even begins) and was left untouched this session, scoped
+> to `useGameLoop.js`. Closed in Session 26: `AttractBackground` now
+> applies the same `TARGET_FPS` skip logic in its own loop, duplicated
+> rather than shared (see CLAUDE.md for why).
 
 The S23 FE runs at up to 120 Hz. `useGameLoop.js:23-39` is uncapped rAF with
 frame-normalised `dt`, so *motion* is correct at any refresh rate — but the
@@ -678,14 +700,22 @@ the cap value in `constants/boids.js`.
 >   plausibly the largest remaining allocation source in the hot loop, but
 >   not named by this finding's original text, and fixing it would mean
 >   rewriting several independently unit-tested pure functions for a
->   change this session wasn't asked to make. A real gap, deliberately
->   left for a future session that explicitly scopes it.
-> - `AttractBackground.jsx` has no equivalent to any of the above (its own
->   separate rAF loop, its own fish/predator allocation pattern) and was
->   left untouched by design, same reasoning as O8/O10: it's explicitly
->   isolated from the real game loop, and this finding's text scopes to
->   `boids.js`/`predator.js`/`particles.js`/`renderer.js`, not the attract
->   scene.
+>   change this session wasn't asked to make. **Confirmed still open as of
+>   Session 26, and iced there by explicit decision, not oversight: it is
+>   optimization without an observed symptom** (no reported jank, no
+>   profiling data pointing at it specifically), so it stays a known,
+>   named gap rather than something a future reader should assume was
+>   simply forgotten. Revisit only if a real symptom shows up that traces
+>   back to it, or if a session is explicitly scoped to take on the risk
+>   of rewriting these pure functions.
+> - `AttractBackground.jsx` (via `game/attract.js`'s own `stepAttract`) has
+>   its own separate fish/predator allocation pattern, with no
+>   `*Into`/`*InPlace` equivalent to any of the above, and remains
+>   untouched: this finding's text scopes to `boids.js`/`predator.js`/
+>   `particles.js`/`renderer.js`, not the attract scene. Distinct from the
+>   DPR/frame-rate gap noted in O8/O10 above, which Session 26 did close
+>   for `AttractBackground`. This bullet is specifically about its
+>   allocation pattern, which Session 26 did not touch.
 >
 > See SPEC.md "Performance (Session 25)" for the allocation-rate estimates.
 
@@ -1416,3 +1446,30 @@ predator mutates in place) and why they are not interchangeable.
 B12 and O11's two follow-ups (the per-force temp-vector allocations inside
 `updateFish`, and `AttractBackground`'s identical unclamped-DPR/
 uncapped-rAF pattern) remain open.
+
+---
+
+# Session 26: B12 done, AttractBackground DPR/frame-cap parity
+
+B12 above is **Done**, device-verified on the S23 FE across both landscape
+orientations. The `AttractBackground` unclamped-DPR/uncapped-rAF gap noted
+in O8 and O10's status blockquotes is also **Done**, closed by reusing the
+existing `MAX_DEVICE_PIXEL_RATIO`/`TARGET_FPS` constants in
+`AttractBackground.jsx`'s own loop, deliberately not by sharing
+`useGameLoop.js` itself. Commit a5b3c5b on `pwa`, merged to `main` in the
+same state. Full detail is in B12 and O8/O10's status blockquotes above,
+and in SPEC.md "Layout and Safe-Area" / "Performance"; not duplicated
+here.
+
+Neither B12 fix was a clipping repair: both `Settings` and `PauseScreen`
+already fit comfortably under a 393px landscape viewport, and the work was
+consistency plus future headroom, stated as such rather than presented as
+bug fixes. See CLAUDE.md for why `AttractBackground`'s frame-skip logic is
+a deliberate duplicate of `useGameLoop.js`'s rather than a shared helper.
+
+Two items remain open by explicit decision this session, not oversight:
+the per-force temp-vector allocations inside `updateFish` (O11, iced as
+optimization without an observed symptom), and `AttractBackground`'s own
+fish/predator allocation pattern in `game/attract.js` (O11, distinct from
+the DPR/frame-rate gap this session closed). Neither was in this session's
+scope, and both are recorded in O11's status blockquote above.

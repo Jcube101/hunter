@@ -246,20 +246,24 @@ in the same way a browser tab does.
 **Compact viewport layout.** `hooks/useCompactViewport.js` is the single
 shared mechanism for adapting to constrained viewport height (landscape
 phones): it returns `isCompact` (`window.innerHeight < 500`), re-evaluated
-on `resize`/`orientationchange`. Four screens use it: `StartScreen`,
-`EndScreen`, `Tutorial`, and `LeaderboardOverlay` (`Leaderboard.jsx`). Each
+on `resize`/`orientationchange`. All six screens use it: `StartScreen`,
+`EndScreen`, `Tutorial`, `LeaderboardOverlay` (`Leaderboard.jsx`),
+`Settings`, and `PauseScreen` (the last two added in Session 26). Each
 applies its own compact-mode reductions on top of the shared boolean
 (smaller type, tighter gaps, fewer leaderboard rows, and so on); the hook
-only supplies the boolean, not the styling. `PauseScreen` and `Settings` do
-not use it yet (ROADMAP.md B12).
+only supplies the boolean, not the styling. `Settings` and `PauseScreen`
+already fit comfortably under a 393px landscape viewport before Session 26
+(computed at roughly 224px and 172px respectively). Wiring the hook in
+was consistency and future headroom, not a clipping fix; there was nothing
+to fix on those two screens.
 
-`EndScreen` and `Tutorial` also wrap their content in a scroll container
-(`overflow-y-auto overscroll-contain` on the root, `min-h-full` centering
-on an inner div) as a fallback: it centers content that fits and scrolls
-content that doesn't, rather than silently clipping. Compact mode is what
-keeps this from actually being needed at a 393px landscape height in the
-realistic worst case; the scroll container is the safety net, not the fit
-strategy.
+`EndScreen`, `Tutorial`, `Settings`, and `PauseScreen` also wrap their
+content in a scroll container (`overflow-y-auto overscroll-contain` on the
+root, `min-h-full` centering on an inner div) as a fallback: it centers
+content that fits and scrolls content that doesn't, rather than silently
+clipping. Compact mode is what keeps this from actually being needed at a
+393px landscape height in the realistic worst case; the scroll container
+is the safety net, not the fit strategy.
 
 `LeaderboardOverlay` takes a different approach, since a 10-row board can't
 be made to fit by shrinking spacing alone: the card caps at `max-h-[90dvh]`
@@ -332,6 +336,14 @@ itself is untouched and still used elsewhere (e.g. mouse input mapping in
 `useInput.js`). See CLAUDE.md for the two distinct patterns this uses
 (double-buffering for boids vs in-place mutation for the predator) and
 why they are not interchangeable.
+
+**AttractBackground (Session 26).** `AttractBackground.jsx`'s own canvas
+sizing and `requestAnimationFrame` loop reuse the same
+`MAX_DEVICE_PIXEL_RATIO`/`TARGET_FPS` constants above, with the identical
+frame-skip carry-forward logic. It deliberately does NOT import or share
+`useGameLoop.js` itself; the two loops stay fully independent, matching
+this component's own header comment. See CLAUDE.md for why the frame-skip
+logic is duplicated rather than extracted into a shared helper.
 
 ---
 
@@ -617,7 +629,7 @@ npm run test        # vitest run
 npm run test:watch  # vitest (watch mode)
 ```
 
-**On `main`, this currently reports 258 tests, all passing.** Phase 0
+**On `main`, this currently reports 272 tests, all passing.** Phase 0
 (Session 20) introduced three deliberate fail-first regression markers for
 two known bugs (A2's `dtSeconds` clamp, one test; B9's joystick margin, two
 tests). Phase 2 (Session 23) fixed both, and each test now passes because
@@ -629,7 +641,10 @@ renders at a given viewport, not that content visually fits (see
 ROADMAP.md A14). Phase 4 (Session 25) added 13 tests: the DPR clamp, the
 frame cap's skip/accumulate/60Hz-vs-120Hz-parity behavior, and equivalence
 proofs (exact trajectory comparison against the original pure functions,
-not just passing assertions) for the three hot-loop optimizations.
+not just passing assertions) for the three hot-loop optimizations. Session
+26 added 14 tests: Settings/PauseScreen compact-layout wiring (PauseScreen
+had no dedicated test file before this session) and AttractBackground's
+DPR clamp and frame-cap skip logic.
 
 ---
 
