@@ -319,6 +319,11 @@ Never hardcode these values inline anywhere else.
 - All catch math is in CSS-pixel world space — `devicePixelRatio` is applied
   only to the canvas backing store and draw transform, never to simulation
   coordinates, so the hitbox is the same physical size on HiDPI displays
+- The applied `devicePixelRatio` is capped at `MAX_DEVICE_PIXEL_RATIO` (2,
+  Session 25) on very high-DPR phones, since the flat-fill/thin-stroke art
+  gains nothing visually above that. This only affects the backing-store
+  resolution, not catch math or hitbox size, which stay unaffected either
+  way per the point above
 
 ### On Catch
 1. Fish removed from simulation immediately

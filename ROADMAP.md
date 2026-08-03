@@ -595,6 +595,17 @@ audio/settings preference or its own toggle.
 ### Performance, frame pacing, and battery
 
 **O8. `devicePixelRatio` is used unclamped. [code]**
+
+> **Status: Done (Session 25), device-checked on the S23 FE (visual quality
+> at the clamped DPR looked fine, no regressions noticed).** `MAX_DEVICE_PIXEL_RATIO
+> = 2` added to `constants/boids.js` as proposed, applied in `App.jsx`'s
+> `sizeCanvas`. Cuts backing-store pixel count ~47% at DPR 2.75, matching
+> this section's estimate exactly. `AttractBackground.jsx` has the identical
+> unclamped-DPR pattern and was deliberately left untouched: this session
+> was scoped to what this finding names (`App.jsx`), and `AttractBackground`
+> is by design isolated from the real game loop. See SPEC.md "Performance
+> (Session 25)".
+
 `App.jsx:134` — `const dpr = window.devicePixelRatio || 1`. On the S23 FE
 (DPR ≈ 2.75) a landscape canvas becomes **2340 × 1080 ≈ 2.5 M pixels**, cleared
 and refilled every frame, with per-fish shadow blur on top (O9). This is the
@@ -620,6 +631,17 @@ out of scope for this session per the brief — this is a rendering-cost note, n
 a proposal to change how glow looks.
 
 **O10. 120 Hz display doubles the workload for no gameplay benefit. [device]**
+
+> **Status: Done (Session 25), device-checked on the S23 FE (game feel
+> reported identical, no regressions noticed).** `TARGET_FPS = 60` added to
+> `constants/boids.js`. Skipped native frames carry their elapsed time
+> forward into the next processed frame rather than dropping it, so round
+> length and motion are provably identical between 60Hz and 120Hz (see
+> SPEC.md "Performance (Session 25)" and `useGameLoop.test.js`'s "frame
+> cap" tests, including a simulated 60Hz-vs-120Hz parity check). Simulated
+> over a 2s window: 120Hz native now delivers ~121 update() calls vs ~122
+> at native 60Hz, down from ~240 uncapped.
+
 The S23 FE runs at up to 120 Hz. `useGameLoop.js:23-39` is uncapped rAF with
 frame-normalised `dt`, so *motion* is correct at any refresh rate — but the
 simulation, the O(n²) boids pass, and the full-canvas repaint all run twice as
@@ -631,6 +653,42 @@ update/draw when under ~16.6 ms — ideally on by default for touch devices, wit
 the cap value in `constants/boids.js`.
 
 **O11. Per-frame allocation churn drives GC jank. [code]**
+
+> **Status: Partially done (Session 25), with two deliberate scope
+> decisions left open rather than closed silently.**
+>
+> Done, each proven equivalent by an actual trajectory comparison against
+> the original pure function (exact equality across hundreds of ticks of
+> scripted, varying input, not just passing tests, see boids.test.js,
+> predator.test.js, particles.test.js): the fish array/objects
+> (`updateFishInto`/`updateSchoolInto`, double-buffered via `useBoids.js`),
+> the predator object (`stepPredatorInto`, mutated in place, safe only
+> because nothing reads a stale snapshot of it later in the same tick, see
+> CLAUDE.md for why this differs from boids' double-buffering and is not
+> automatically safe to copy elsewhere), the particle array/objects
+> (`updateParticlesInPlace`), and `worldToScreen`'s per-fish/per-particle
+> allocation in the render path (inlined as scalars in `renderer.js`'s
+> `drawSchool` and `particles.js`'s `drawParticles`; `camera.js`'s
+> `worldToScreen` itself is untouched).
+>
+> **Left open, as follow-ups, not fixed:**
+> - The six per-force temporary `{x, y}` vector allocations inside
+>   `updateFish` (`separation`/`alignment`/`cohesion`/`flee`/
+>   `edgeRepulsion`/`anchorForce`, plus `normalize`/`clampMagnitude`),
+>   plausibly the largest remaining allocation source in the hot loop, but
+>   not named by this finding's original text, and fixing it would mean
+>   rewriting several independently unit-tested pure functions for a
+>   change this session wasn't asked to make. A real gap, deliberately
+>   left for a future session that explicitly scopes it.
+> - `AttractBackground.jsx` has no equivalent to any of the above (its own
+>   separate rAF loop, its own fish/predator allocation pattern) and was
+>   left untouched by design, same reasoning as O8/O10: it's explicitly
+>   isolated from the real game loop, and this finding's text scopes to
+>   `boids.js`/`predator.js`/`particles.js`/`renderer.js`, not the attract
+>   scene.
+>
+> See SPEC.md "Performance (Session 25)" for the allocation-rate estimates.
+
 Every frame the game allocates: a whole new fish array with a new object per
 fish (`boids.js:190-201`, `fish.map(...)` returning `{x, y, vx, vy}`), a new
 predator object (`predator.js:50`), a new particle array with a spread-copied
@@ -1334,3 +1392,27 @@ for B12, which was not picked up this session.
 
 B12 (out of scope this session) and Phase 4 performance work (O8, O10,
 O11) remain open.
+
+---
+
+# Session 25: Phase 4, performance (O8/O10 done, O11 partial)
+
+O8 and O10 above are fully **Done**, device-checked on the S23 FE (visual
+quality at the clamped DPR and game feel both reported fine, no
+regressions noticed). O11 is **Partially done**, with two scope decisions
+recorded in its own status blockquote above rather than closed silently.
+Commit 2e7637d on `pwa`, merged to `main` in the same state. Full detail is
+in each finding's status blockquote above and in SPEC.md "Performance
+(Session 25)"; not duplicated here.
+
+Unlike Phases 1 through 3, this phase changed how the game loop executes
+rather than fixing something broken, so the equivalence proofs (exact
+trajectory comparison against the original pure functions, not just
+passing tests) are the load-bearing evidence here, not device
+verification alone. See CLAUDE.md for the two distinct hot-path
+allocation-avoidance patterns this introduced (boids double-buffers,
+predator mutates in place) and why they are not interchangeable.
+
+B12 and O11's two follow-ups (the per-force temp-vector allocations inside
+`updateFish`, and `AttractBackground`'s identical unclamped-DPR/
+uncapped-rAF pattern) remain open.

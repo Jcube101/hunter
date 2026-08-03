@@ -163,6 +163,31 @@ For local dev, the Vite proxy config in vite.config.js points /api → localhost
   outside that scrollable region on purpose, so they stay reachable
   regardless of board size. Moving the scroll container back onto the whole
   card would let Close clip again at a full 10-row board; keep the split.
+- **Two distinct hot-path allocation-avoidance patterns exist (Session 25,
+  ROADMAP.md O11). Know which one applies before copying either.**
+  - **Boids (`boids.js`'s `updateFishInto`/`updateSchoolInto`, wired in
+    `useBoids.js`) double-buffers**: each tick writes into a SEPARATE array
+    from the one being read, then the two arrays are swapped. This is
+    required, not a style choice. Every fish's forces read the WHOLE
+    `allFish` array as that tick's snapshot, so writing fish `i`'s result
+    back into fish `i` before fish `i+1..n` have read it would make later
+    fish react to an already-updated neighbor instead of the pre-tick
+    position. That is a real, order-dependent simulation bug, not just
+    reduced clarity.
+  - **Predator (`predator.js`'s `stepPredatorInto`, wired in `App.jsx`)
+    mutates `predatorRef.current` in place**, no double-buffer. This is
+    safe only because there is exactly one predator and nothing reads a
+    stale snapshot of it later in the same tick (`movePredator()` runs,
+    then `tickBoids()` reads the already-moved predator, the same order the
+    old allocate-a-new-object version produced).
+  - **The predator's in-place pattern is NOT automatically safe to reuse
+    elsewhere.** Before mutating any shared object in place in a hot path,
+    check whether anything else in the same tick reads that object
+    expecting its PRE-mutation value. If yes, double-buffer like boids
+    does. If no, in-place mutation like the predator is fine. Getting this
+    wrong produces a bug that an equivalence test running the mutated path
+    ALONE won't catch, since the bug is about read ORDER against other
+    code, not about the function's own arithmetic.
 ---
 
 ## Verification Steps (run after every deploy)

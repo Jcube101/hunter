@@ -291,6 +291,48 @@ additive, not have one substitute for the other, or B9's Android
 gesture-strip clearance and B3's cutout clearance stop composing and one
 of the two regresses silently.
 
+### Performance (Session 25)
+
+Two named, deliberately-raisable constants in `constants/boids.js`:
+
+- **`MAX_DEVICE_PIXEL_RATIO = 2`**, applied in `App.jsx`'s `sizeCanvas`. The
+  art is flat fills and thin strokes, not fine detail, so a real DPR above
+  this (2.75 on the S23 FE) buys negligible visual quality for a large
+  pixel-count cost. Clamping cuts backing-store pixel count by roughly 47%
+  on that device (2340x1081 down to 1702x786 at an 851x393 CSS viewport).
+- **`TARGET_FPS = 60`**, read by `useGameLoop.js`. rAF fires at the
+  display's native refresh rate (up to 120Hz on the S23 FE), so an uncapped
+  loop runs the O(n^2) boids pass and the full-canvas repaint twice as
+  often as needed. Named so raising it (e.g. to 120 for a future
+  high-refresh preference) is a one-line change, not a rewrite.
+
+**Frame-skip behavior.** `useGameLoop.js`'s rAF callback still runs on
+every native frame, but only calls `update()`/`draw()` when at least
+`1000 / TARGET_FPS` ms (minus a small jitter tolerance) has passed since
+the last frame that actually ran them. The internal `lastRef` timestamp
+only advances on a frame that runs `update()`/`draw()`, so a skipped
+frame's elapsed time is not dropped, it carries forward and is included in
+the next processed frame's `dt`/`dtSeconds`. This is what keeps round
+length and motion identical between a 120Hz device (which now processes
+roughly every other native frame) and a 60Hz device (which processes
+nearly every native frame): both end up delivering the same total
+`dt`/`dtSeconds` over the same wall-clock duration, just via a different
+number of native ticks. See `useGameLoop.test.js`'s "frame cap" tests for
+the simulated 60Hz-vs-120Hz comparison.
+
+**Hot-loop allocation avoidance.** `boids.js`, `predator.js`, and
+`particles.js` each have a buffer-reusing variant (`updateFishInto`/
+`updateSchoolInto`, `stepPredatorInto`, `updateParticlesInPlace`) used only
+by `useBoids.js`/`App.jsx`'s hot path, alongside the original pure
+functions, which are unchanged and still what the unit tests exercise.
+`renderer.js`'s `drawSchool` and `particles.js`'s `drawParticles` also
+inline `worldToScreen`'s arithmetic instead of allocating a `{x, y}`
+object per fish/particle per draw frame; `camera.js`'s `worldToScreen`
+itself is untouched and still used elsewhere (e.g. mouse input mapping in
+`useInput.js`). See CLAUDE.md for the two distinct patterns this uses
+(double-buffering for boids vs in-place mutation for the predator) and
+why they are not interchangeable.
+
 ---
 
 ## Backend Architecture
@@ -575,7 +617,7 @@ npm run test        # vitest run
 npm run test:watch  # vitest (watch mode)
 ```
 
-**On `main`, this currently reports 245 tests, all passing.** Phase 0
+**On `main`, this currently reports 258 tests, all passing.** Phase 0
 (Session 20) introduced three deliberate fail-first regression markers for
 two known bugs (A2's `dtSeconds` clamp, one test; B9's joystick margin, two
 tests). Phase 2 (Session 23) fixed both, and each test now passes because
@@ -584,7 +626,10 @@ tests remain in the suite. Phase 3 (Session 24) added 22 tests covering the
 compact-viewport layout branches and the joystick's safe-area inset
 composition; jsdom has no layout engine, so these prove which branch
 renders at a given viewport, not that content visually fits (see
-ROADMAP.md A14).
+ROADMAP.md A14). Phase 4 (Session 25) added 13 tests: the DPR clamp, the
+frame cap's skip/accumulate/60Hz-vs-120Hz-parity behavior, and equivalence
+proofs (exact trajectory comparison against the original pure functions,
+not just passing assertions) for the three hot-loop optimizations.
 
 ---
 
