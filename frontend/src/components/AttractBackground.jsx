@@ -18,7 +18,18 @@ import { useEffect, useRef } from 'react'
 import { theme } from '../constants/theme.js'
 import { drawFish, drawShark } from '../game/renderer.js'
 import { initAttractFish, initAttractShark, stepAttract } from '../game/attract.js'
-import { FLEE_RADIUS } from '../constants/boids.js'
+import { FLEE_RADIUS, MAX_DEVICE_PIXEL_RATIO, TARGET_FPS } from '../constants/boids.js'
+
+// Reuses the same constants the real game loop clamps to (ROADMAP.md O8/O10
+// follow-up, Session 26) — NOT useGameLoop.js itself. This effect stays a
+// fully separate rAF loop, per this file's own header comment: attract mode
+// must never couple to the real game's loop/state. Runs on the start screen,
+// i.e. whenever the player is idle before a round even begins, so an
+// unclamped DPR and an uncapped refresh rate here cost battery for no
+// gameplay benefit, same reasoning as the real loop, just decorative rather
+// than simulated.
+const FRAME_INTERVAL_MS = 1000 / TARGET_FPS
+const FRAME_SKIP_EPSILON_MS = 2 // matches useGameLoop.js's jitter tolerance
 
 export default function AttractBackground() {
   const canvasRef = useRef(null)
@@ -38,7 +49,7 @@ export default function AttractBackground() {
     let running = false
 
     const size = () => {
-      dpr = window.devicePixelRatio || 1
+      dpr = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO)
       const w = canvas.offsetWidth || window.innerWidth
       const h = canvas.offsetHeight || window.innerHeight
       canvas.width = Math.round(w * dpr)
@@ -64,9 +75,23 @@ export default function AttractBackground() {
 
     // Frame-normalized delta (~1.0 at 60Hz, capped at 3), mirroring useGameLoop so
     // motion stays refresh-rate independent and can't spiral after a stall.
+    //
+    // Frame cap (O10 follow-up): rAF still fires every native frame, but the
+    // step+draw work below is skipped when too little real time has passed
+    // since the last processed frame. `last` only advances on a processed
+    // frame, so a skipped frame's elapsed time carries into the next one's
+    // `elapsed` rather than being dropped — same logic as useGameLoop.js,
+    // duplicated here rather than shared, per this file's isolation
+    // requirement. There's no round clock or score to protect here (this is
+    // decorative), so unlike useGameLoop.js there's no dtSeconds/A2 concern —
+    // only motion smoothness, which the frame-normalized dt already handles.
     const loop = (now) => {
       if (!running) return
       const elapsed = last ? now - last : 1000 / 60
+      if (last && elapsed < FRAME_INTERVAL_MS - FRAME_SKIP_EPSILON_MS) {
+        raf = requestAnimationFrame(loop)
+        return
+      }
       last = now
       const dt = Math.min(elapsed / (1000 / 60), 3)
       const stepped = stepAttract(fish, shark, world, dt)
