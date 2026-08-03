@@ -241,6 +241,56 @@ implicitly when fullscreen ends, but that was never guaranteed, and a
 standalone session can exit gameplay without necessarily ending fullscreen
 in the same way a browser tab does.
 
+### Layout and Safe-Area (Session 24)
+
+**Compact viewport layout.** `hooks/useCompactViewport.js` is the single
+shared mechanism for adapting to constrained viewport height (landscape
+phones): it returns `isCompact` (`window.innerHeight < 500`), re-evaluated
+on `resize`/`orientationchange`. Four screens use it: `StartScreen`,
+`EndScreen`, `Tutorial`, and `LeaderboardOverlay` (`Leaderboard.jsx`). Each
+applies its own compact-mode reductions on top of the shared boolean
+(smaller type, tighter gaps, fewer leaderboard rows, and so on); the hook
+only supplies the boolean, not the styling. `PauseScreen` and `Settings` do
+not use it yet (ROADMAP.md B12).
+
+`EndScreen` and `Tutorial` also wrap their content in a scroll container
+(`overflow-y-auto overscroll-contain` on the root, `min-h-full` centering
+on an inner div) as a fallback: it centers content that fits and scrolls
+content that doesn't, rather than silently clipping. Compact mode is what
+keeps this from actually being needed at a 393px landscape height in the
+realistic worst case; the scroll container is the safety net, not the fit
+strategy.
+
+`LeaderboardOverlay` takes a different approach, since a 10-row board can't
+be made to fit by shrinking spacing alone: the card caps at `max-h-[90dvh]`
+and only the ranked-list region is `overflow-y-auto`, so the title,
+difficulty tabs, platform toggle, and Close button stay pinned outside that
+region and reachable regardless of board size. Keep this structure when
+touching `LeaderboardOverlay`: moving the scroll container back onto the
+whole card would let the Close button clip again at a full board.
+
+**Safe-area insets.** `index.css` defines `--safe-top`/`--safe-bottom`/
+`--safe-left`/`--safe-right` as CSS custom properties sourced from
+`env(safe-area-inset-*, 0px)`. They resolve to `0px` on any device without
+a cutout, rounded-corner, or gesture-bar inset, so this is a no-op there,
+including in every existing test (jsdom never loads `index.css`). Applied
+to corner-anchored controls (`StartScreen`'s settings/audio buttons and
+"Best played in landscape" hint, `Tutorial`'s Skip, `Settings`' close,
+`Minimap`, `RotationToast`) via Tailwind arbitrary properties, e.g.
+`[top:calc(1rem_+_var(--safe-top))]` in place of a plain `top-4`.
+
+The joystick base in `useInput.js` composes the same insets into its
+actual touch geometry, not just a visual (nothing draws the joystick at
+all, see `renderer.js`, Session 8). `insetRef` is read via
+`getComputedStyle(document.documentElement)`, cached, and refreshed on
+`resize`/`orientationchange` rather than on every `touchmove`. The insets
+add on top of `JOYSTICK_MARGIN` (48px, Session 23/B9); they do not replace
+it. This composition is easy to break by accident: a future change to
+either `JOYSTICK_MARGIN` or the inset-reading logic should keep both
+additive, not have one substitute for the other, or B9's Android
+gesture-strip clearance and B3's cutout clearance stop composing and one
+of the two regresses silently.
+
 ---
 
 ## Backend Architecture
@@ -525,12 +575,16 @@ npm run test        # vitest run
 npm run test:watch  # vitest (watch mode)
 ```
 
-**On `main`, this currently reports 223 tests, all passing.** Phase 0
+**On `main`, this currently reports 245 tests, all passing.** Phase 0
 (Session 20) introduced three deliberate fail-first regression markers for
 two known bugs (A2's `dtSeconds` clamp, one test; B9's joystick margin, two
 tests). Phase 2 (Session 23) fixed both, and each test now passes because
 the code changed, not because the assertion did. No deliberately-failing
-tests remain in the suite.
+tests remain in the suite. Phase 3 (Session 24) added 22 tests covering the
+compact-viewport layout branches and the joystick's safe-area inset
+composition; jsdom has no layout engine, so these prove which branch
+renders at a given viewport, not that content visually fits (see
+ROADMAP.md A14).
 
 ---
 

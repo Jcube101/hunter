@@ -160,14 +160,27 @@ Text: "Rotate your phone for the best experience 🔄"
 
 ---
 
-## Start Screen Responsive Layout
+## Compact Viewport Layout (Session 24)
 
-The start screen adapts to constrained viewport height (landscape on phones).
-When viewport height < 500px:
-- Title font size reduced
-- Vertical gaps and padding tightened
-- All elements remain visible without scrolling
-Detected via window.innerHeight on mount and on resize/orientation change.
+Every overlay screen adapts to constrained viewport height (landscape on
+phones), via a single shared hook, `useCompactViewport()`
+(`hooks/useCompactViewport.js`). When viewport height < 500px, `isCompact`
+becomes true: title/heading sizes shrink, vertical gaps and padding tighten,
+and each screen's own layout-specific reductions apply (see below).
+Detected via `window.innerHeight` on mount and re-checked on
+resize/orientationchange.
+
+Screens using it: Start Screen, End Screen, Tutorial, and the Leaderboard
+overlay. Pause Screen and Settings do not yet (ROADMAP.md B12, not yet
+implemented). Their content is light enough that it isn't a live clipping
+bug, so this was deliberately left for that finding rather than folded in
+here.
+
+On the Start Screen specifically, compact mode alone is sufficient: all
+elements remain visible without scrolling, no fallback needed. End Screen,
+Tutorial, and the Leaderboard overlay are different: each also gets a
+scroll fallback (see their own sections below) as a safety net, since their
+content is heavier and less bounded.
 
 ---
 
@@ -398,6 +411,17 @@ Never hardcode these values inline anywhere else.
 - **Play Again** and **Menu** buttons
 - **Full Leaderboard** button → shared overlay (difficulty tabs + platform toggle)
 
+**Compact variant (Session 24, `useCompactViewport()`):** a genuine design
+variant on landscape phones, not just tighter spacing. The heading shrinks,
+the top preview shows 3 rows instead of 5, the name input and its Submit
+button sit side by side instead of stacked, and Play Again / Menu / Full
+Leaderboard collapse onto a single row instead of two. This keeps the
+worst realistic case (a qualifying, new-personal-best round, which adds
+both the name-input block and the celebration line) under a 393px
+landscape viewport without needing to scroll. The screen also gets a
+scroll fallback as a safety net for anything not accounted for, not as the
+primary fit strategy (see ROADMAP.md B1/B6).
+
 ---
 
 ## Attract Mode (Start-Screen Background)
@@ -443,6 +467,15 @@ Slide 3: "Catch as many as you can in 60 seconds" — score counter illustration
 After last slide or skip: set localStorage `hunter_tutorial_seen` = true.
 Never shown again. Accessible again via "How to play" link on start screen.
 
+**Compact variant (Session 24, `useCompactViewport()`):** on landscape
+phones, this is the first-run screen, so it is the worst place to have a
+clipped Next/Play button. The illustration's on-screen display size shrinks
+(CSS only; the canvas still draws its artwork at full resolution, so
+nothing is redrawn or repositioned), title and body text shrink, and the
+gaps between the illustration, text, dots, and button tighten. A scroll
+fallback exists as a safety net (ROADMAP.md B5/B6), same reasoning as the
+End Screen above.
+
 ---
 
 ## Leaderboard
@@ -462,6 +495,14 @@ platform. Full leaderboard view has three difficulty tabs plus an independent
 desktop/mobile platform toggle (view-only, session state — it never changes the
 platform a score is submitted under, which is always the player's real device).
 Defaults: the mode just played + the player's detected platform.
+
+**Reachability at any board size (Session 24):** a full 10-row board is
+taller than a 393px landscape viewport, so the overlay card caps its own
+height and only the ranked-list region scrolls (ROADMAP.md B4). The
+title, difficulty tabs, platform toggle, and Close button stay pinned
+outside that scrollable region and are reachable regardless of how many
+rows the board has. `useCompactViewport()` also tightens spacing on
+landscape phones (see "Compact Viewport Layout" above).
 
 API: GET /api/leaderboard?difficulty=easy|normal|hardcore&platform=desktop|mobile
      POST /api/leaderboard — body includes required `platform`

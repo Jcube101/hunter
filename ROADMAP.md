@@ -115,6 +115,17 @@ same change.
 
 ### B1. End screen overflows a landscape viewport; "Play Again" is clipped — [code]
 
+> **Status: Done (Session 24), device-verified on the S23 FE for every End
+> screen state, including the qualifying-run worst case.** A compact
+> layout (`useCompactViewport()`, O24) brings the worst realistic case
+> (qualifying + new PB) from roughly 616px down to roughly 328px against a
+> 393px landscape viewport: smaller heading, name input and its Submit
+> button side by side instead of stacked, the top preview cut to 3 rows
+> instead of 5, and Play Again / Menu / Full Leaderboard on one row instead
+> of two. A scroll fallback (B6) also wraps the screen for anything not
+> accounted for, but was not needed for the cases actually tested. See
+> SPEC.md "Layout and Safe-Area (Session 24)".
+
 **This is the reported bug, and the cause is confirmed by reading the code.**
 
 **Where:** `frontend/src/components/EndScreen.jsx:78` — the root is
@@ -182,6 +193,16 @@ plain browser tab.
 
 ### B3. `viewport-fit=cover` is set but no `env(safe-area-inset-*)` is used anywhere — [code]
 
+> **Status: Done (Session 24), device-verified on the S23 FE across both
+> landscape orientations.** `index.css` defines `--safe-top`/`--safe-bottom`/
+> `--safe-left`/`--safe-right` from `env(safe-area-inset-*, 0px)`, applied
+> to every control this finding names: StartScreen's gear/audio buttons and
+> landscape hint, Tutorial's Skip, Settings' close, Minimap, RotationToast.
+> The joystick base composes the same insets into its actual touch geometry
+> in `useInput.js`, on top of B9's `JOYSTICK_MARGIN` (48px), not instead of
+> it, per this finding's own recommendation. See SPEC.md "Layout and
+> Safe-Area (Session 24)".
+
 **Where:** `frontend/index.html` sets `viewport-fit=cover`; a repo-wide search
 finds **zero** uses of `env(safe-area-inset-*)` in any CSS, Tailwind class, or
 inline style.
@@ -216,6 +237,13 @@ fullscreen) and adding the padding, with the joystick base offset by
 
 ### B4. Leaderboard overlay is badly clipped in landscape, and its Close button is off-screen — [code]
 
+> **Status: Done (Session 24), device-verified on the S23 FE with a full
+> 10-entry board.** The card caps at `max-h-[90dvh]` and only the
+> ranked-list region scrolls, exactly as proposed below: title, difficulty
+> tabs, platform toggle, and Close stay pinned outside that region and
+> reachable regardless of board size. See CLAUDE.md for the "keep the
+> split" invariant note.
+
 **Where:** `frontend/src/components/Leaderboard.jsx:91-144`
 (`LeaderboardOverlay`) — `flex items-center justify-center` around a card with
 `px-8 py-7`, `gap-4`, and `LeaderboardList … limit={10}`.
@@ -239,6 +267,13 @@ rule (`gap-2`, `px-5 py-4`).
 
 ### B5. Tutorial overflows in landscape — [code]
 
+> **Status: Done (Session 24), device-verified on the S23 FE, Next/Play on
+> slide 2 (the tallest slide).** Compact mode brings slide 2 from roughly
+> 410px down to roughly 273px: tighter gaps, illustration display size
+> scaled by 0.7 via CSS only (the canvas still draws at full resolution, so
+> nothing is redrawn or repositioned), and smaller title/body text. See
+> SPEC.md "Layout and Safe-Area (Session 24)".
+
 **Where:** `frontend/src/components/Tutorial.jsx:250` — `gap-8` (32 px) with a
 fixed-size illustration canvas whose height comes from `SLIDES` (`:18-37`;
 120–130 px), plus title, body, dots, and a `py-3 px-12` button.
@@ -260,6 +295,15 @@ button right), which uses the wide-and-short shape properly instead of fighting
 it.
 
 ### B6. No `overflow`/scroll escape hatch on any overlay screen — [code]
+
+> **Status: Done for EndScreen, Tutorial, and LeaderboardOverlay (Session
+> 24), device-verified on the S23 FE.** EndScreen and Tutorial got the
+> `overflow-y-auto` root plus `min-h-full` centered inner div pattern
+> proposed below, as a fallback net behind compact layout (B1/B5), not the
+> primary fit strategy. LeaderboardOverlay got a variant suited to its
+> heavier content: only the ranked-list region scrolls, with the header and
+> Close pinned outside it (B4). PauseScreen and Settings are not covered
+> (B12, not yet implemented).
 
 **Where:** systemic. `App.jsx:386` is `overflow-hidden`; `index.css` sets
 `overflow: hidden` on `html, body, #root`; every screen component
@@ -715,6 +759,17 @@ informational text at 14 px on touch devices; reserve 12 px for decorative
 labels only.
 
 **O24. The compact-layout rule exists in exactly one component. [code]**
+
+> **Status: Done (Session 24), with a deliberate scoping decision.**
+> `useCompactViewport()` extracted to `hooks/`, and `StartScreen` refactored
+> onto it. Used in `EndScreen`, `Tutorial`, and `LeaderboardOverlay` too,
+> since those are the three findings (B1/B4/B5) this session actually
+> fixed. `Settings` and `PauseScreen` were deliberately left unwired rather
+> than adopting the hook speculatively: neither has a live clipping bug
+> (see B12), so wiring them here would have been scope creep beyond what
+> was asked, not a completion of this finding's literal "all six screens."
+> B12 is the right place for that pair if it's ever picked up.
+
 `StartScreen.jsx:25, 34-42` implements a `window.innerHeight < 500` breakpoint
 with its own resize/orientationchange listeners. `EndScreen`, `Tutorial`,
 `Settings`, `PauseScreen`, and `LeaderboardOverlay` have no equivalent — which
@@ -724,6 +779,12 @@ suite. This is the structural fix that the individual bug fixes should be built
 on rather than patched around.
 
 **O25. Tailwind's `sm:` breakpoints are width-based and useless here. [code]**
+
+> **Status: Done (Session 24).** `EndScreen` and `Tutorial` now gate their
+> `sm:` type scaling behind `!isCompact`, exactly as proposed below.
+> `StartScreen`'s own `sm:` usage was already correctly gated this way
+> before this session; nothing there needed changing.
+
 `EndScreen.jsx:79` (`sm:text-5xl`) and `Tutorial.jsx:269` (`sm:text-4xl`) scale
 type up at ≥640 px **width**. A phone in landscape is ~851 px wide and ~393 px
 tall, so it matches `sm:` and gets the *large* type — precisely the wrong
@@ -1252,3 +1313,24 @@ deliberately-failing tests left. See SPEC.md "Testing (frontend)".
 Layout and safe-area work (B1, B3, B4, B5, B6) and performance work (O8,
 O10, O11) were explicitly out of scope for this session and remain open,
 Phase 3 and Phase 4 respectively.
+
+---
+
+# Session 24: Phase 3, layout and safe-area (fixed)
+
+B1, B3, B4, B5, B6, O24, and O25 above are all **Done**, device-verified on
+the S23 FE, including every End screen state (plain, new-PB, qualifying
+with the name input, offline, error), the leaderboard overlay's Close
+button with a full 10-entry board, the tutorial's Next/Play on slide 2,
+safe-area insets across both landscape orientations, and no Phase 2
+regressions. Commit b4e9693 on `pwa`, merged to `main` in the same state.
+Full detail is in each finding's status blockquote above and in SPEC.md
+"Layout and Safe-Area (Session 24)"; not duplicated here.
+
+O24 was scoped to the four screens with an actual finding this session
+(StartScreen, EndScreen, Tutorial, LeaderboardOverlay), not literally all
+six as originally worded. Settings and PauseScreen were deliberately left
+for B12, which was not picked up this session.
+
+B12 (out of scope this session) and Phase 4 performance work (O8, O10,
+O11) remain open.

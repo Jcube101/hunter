@@ -157,6 +157,12 @@ For local dev, the Vite proxy config in vite.config.js points /api → localhost
   1.4.4 failure. `touch-action: none` on the canvas (index.css) is now the
   sole mechanism preventing gameplay zoom; verify it still does before
   touching either file.
+- **`LeaderboardOverlay` (components/Leaderboard.jsx) caps at
+  `max-h-[90dvh]` with only the ranked-list region scrolling** (Session 24,
+  ROADMAP.md B4). The Close button and the difficulty/platform controls sit
+  outside that scrollable region on purpose, so they stay reachable
+  regardless of board size. Moving the scroll container back onto the whole
+  card would let Close clip again at a full 10-row board; keep the split.
 ---
 
 ## Verification Steps (run after every deploy)
