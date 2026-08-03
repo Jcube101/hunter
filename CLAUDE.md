@@ -151,6 +151,12 @@ For local dev, the Vite proxy config in vite.config.js points /api → localhost
 - **Never remove frontend/dist/** — the live service serves this directory 
   directly. Removing it takes production down immediately. dist/ is gitignored 
   but must remain on disk. Rebuild in place with npm run build, never rm -rf dist/.
+- **Do not re-add `maximum-scale`/`user-scalable=no` to the viewport meta in
+  index.html.** Removed deliberately in Session 23 (ROADMAP.md B13):
+  blocking pinch-zoom on the leaderboard/tutorial/settings screens is a WCAG
+  1.4.4 failure. `touch-action: none` on the canvas (index.css) is now the
+  sole mechanism preventing gameplay zoom; verify it still does before
+  touching either file.
 ---
 
 ## Verification Steps (run after every deploy)

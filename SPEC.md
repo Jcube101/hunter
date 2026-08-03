@@ -201,6 +201,46 @@ lifetime of the screen.
   rejection overwrite a just-succeeded reconnect fetch, which read as
   "Couldn't load scores" persisting despite a healthy network.
 
+### Round Lifecycle and Input (Session 23)
+
+**Pausing.** Two independent paths call `pauseGame()`, either of which can
+fire first:
+
+- **Fullscreen exit** (`handleFullscreenExit`, `App.jsx`): fires on
+  `fullscreenchange`, the original path, covering the desktop Escape/alt-tab
+  case and any browser-tab back gesture that exits fullscreen.
+- **`visibilitychange`** (`App.jsx`): fires whenever `document.hidden`
+  becomes true during play. Added because the fullscreen path is not
+  guaranteed in a standalone installed session, where the app may already be
+  fullscreen and a back gesture may background it without ever firing
+  `fullscreenchange`. Device-verified on the S23 FE: the Android back
+  gesture pauses correctly in standalone mode via this path.
+
+`pauseGame()` only acts while `stateRef.current === 'playing'`, so whichever
+path fires first wins and the other is a no-op.
+
+**`dtSeconds` clamp.** `useGameLoop.js` caps `dtSeconds` (the value that
+decrements the round timer) at 0.25s per frame, in addition to the existing
+`dt` (motion) cap of 3. This is a defensive backstop, not the primary fix:
+with the `visibilitychange` pause above, the loop should already be stopped
+before a large frame gap can occur. The clamp exists for the case where
+pausing is somehow bypassed, so a single frame can never charge more than a
+quarter-second against the round clock regardless.
+
+**Stale joystick input.** `useInput.js` clears `inputPosRef` and
+`joystickRef` on `visibilitychange` (hidden) and `window blur`, in addition
+to the existing `touchend`/`touchcancel` handling. An interrupted drag (a
+call, the notification shade, an app switch) does not always deliver a
+touch-end event, and without this the shark would resume moving toward a
+stale vector with no finger on the screen.
+
+**Orientation lock.** `useFullscreen.js`'s `exit()` now releases the
+orientation lock (`screen.orientation.unlock()`) alongside exiting
+fullscreen, guarded the same way as the lock call. Chrome releases the lock
+implicitly when fullscreen ends, but that was never guaranteed, and a
+standalone session can exit gameplay without necessarily ending fullscreen
+in the same way a browser tab does.
+
 ---
 
 ## Backend Architecture
@@ -485,23 +525,12 @@ npm run test        # vitest run
 npm run test:watch  # vitest (watch mode)
 ```
 
-**On `main`, this currently reports 211 tests, 208 passing, 3 failing.**
-That is expected, not a broken build. The 3 failures are deliberate,
-fail-first regression markers for two known, already-diagnosed bugs
-scheduled for later phases (see ROADMAP.md):
-
-- `useGameLoop.test.js`: asserts `dtSeconds` gets clamped after a long
-  frame stall. It isn't yet, so a backgrounded/interrupted round currently
-  gets charged the full wall-clock gap against its timer in a single frame.
-- `useInput.test.js` (×2): assert the mobile joystick's activation zone
-  clears Android's edge-gesture exclusion strip by a safe margin. It
-  currently sits closer to the edge than that.
-
-Each failing test's assertion documents the *intended* behavior. The
-measured value in the failure output is the actual, current, unfixed
-behavior. Do not "fix" these tests to make the suite green. Fix the
-underlying code instead, at which point the tests start passing on their
-own.
+**On `main`, this currently reports 223 tests, all passing.** Phase 0
+(Session 20) introduced three deliberate fail-first regression markers for
+two known bugs (A2's `dtSeconds` clamp, one test; B9's joystick margin, two
+tests). Phase 2 (Session 23) fixed both, and each test now passes because
+the code changed, not because the assertion did. No deliberately-failing
+tests remain in the suite.
 
 ---
 

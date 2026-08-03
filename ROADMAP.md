@@ -302,6 +302,13 @@ probably better on a phone: move name entry into its own focused modal step
 
 ### B8. Stale joystick state can make the shark drive itself after an interruption — [code]
 
+> **Status: Done (Session 23).** `useInput.js` clears `inputPosRef` and
+> `joystickRef` on `visibilitychange` (hidden) and `window blur`, in addition
+> to the existing `touchend`/`touchcancel` handling. The proposed fix's part
+> 2 (`App.jsx` pausing on `visibilitychange`) also landed, folded together
+> with A2 and O21 since all three needed the same listener. See SPEC.md
+> "Round Lifecycle and Input (Session 23)".
+
 **Where:** `frontend/src/hooks/useInput.js:104-112` (`onTouchEnd`) and
 `frontend/src/App.jsx` — there is no `visibilitychange` handler for the game.
 
@@ -329,6 +336,13 @@ explicit to the player rather than a silent free pause.
 
 ### B9. Android edge-swipe zones overlap the joystick activation area — [device]
 
+> **Status: Done (Session 23), device-verified on the S23 FE.** `JOYSTICK_MARGIN`
+> raised 40 → 48 (originally 20), a smaller shift than this section's proposed
+> ~72, chosen to clear the independently-derived 24px safe-edge test
+> (`useInput.test.js`) with a small buffer (28px) rather than relocate the
+> stick. Reachability confirmed on-device; if it had hurt reachability the
+> plan was to raise it further, but that wasn't necessary.
+
 **Where:** `constants/boids.js:68-74` — base center at
 `(JOYSTICK_MARGIN + JOYSTICK_RADIUS)` = **(100, height − 100)**, with
 `JOYSTICK_ACTIVATE_RADIUS = 80`.
@@ -352,6 +366,11 @@ same constants, so this is a one-line tuning change.
 
 ### B10. `RotationToast` only ever evaluates orientation once, at mount — [code]
 
+> **Status: Done (Session 23), device-verified on the S23 FE.** Now
+> subscribes to `resize`/`orientationchange` and re-evaluates: rotating into
+> portrait post-mount arms the hint, rotating back to landscape before it
+> fires cancels it. The sessionStorage once-per-session guard is unchanged.
+
 **Where:** `frontend/src/components/RotationToast.jsx:19-20` — `isPortrait` is
 read inside a `useEffect` with `[]` deps and never recomputed.
 
@@ -366,6 +385,10 @@ portrait)')` and re-evaluate, with the `sessionStorage` once-per-session guard
 kept as-is.
 
 ### B11. Orientation lock is never released — [code]
+
+> **Status: Done (Session 23).** `useFullscreen.js`'s `exit()` now calls
+> `screen.orientation.unlock()`, guarded in the same `try/catch` pattern as
+> the lock call in `enter()`.
 
 **Where:** `frontend/src/hooks/useFullscreen.js:24-31` calls
 `screen.orientation.lock('landscape')`; there is no matching
@@ -396,6 +419,13 @@ ever added to it.
 rules from B3/B6 rather than fixing in isolation.
 
 ### B13. `maximum-scale=1.0, user-scalable=no` blocks pinch-zoom — [code]
+
+> **Status: Done (Session 23), device-verified on the S23 FE.** Both removed
+> from the viewport meta in `frontend/index.html`. `touch-action: none` on
+> the canvas (`index.css`) confirmed sufficient on its own to keep gameplay
+> gesture-free; pinch-zoom now works on the leaderboard/tutorial/settings
+> screens with no gameplay regression. See CLAUDE.md for the "do not re-add"
+> note.
 
 **Where:** `frontend/index.html` viewport meta.
 
@@ -643,6 +673,18 @@ when the lock isn't held — this is the standard mobile-game pattern and it als
 prevents the world/viewport mismatch from B14.
 
 **O21. Standalone mode changes the pause trigger, and nothing accounts for it. [code] / [device]**
+
+> **Status: Done (Session 23), device-verified on the S23 FE.** `App.jsx` now
+> pauses on `visibilitychange`, independent of the existing fullscreen-exit
+> path, whichever fires first. Confirmed on-device: the Android back gesture
+> pauses the round correctly in standalone (installed) mode, resolving the
+> open question this finding raised. The `history.pushState`/`popstate`
+> guard this section also floats was deliberately not implemented: a back
+> gesture that closes the PWA outright cannot be intercepted by a `popstate`
+> listener either, so it would not have closed the actual gap, only added a
+> second mechanism for the same partial coverage `visibilitychange` already
+> provides.
+
 The pause path is entirely fullscreen-driven: `handleFullscreenExit`
 (`App.jsx:115`) fires from `fullscreenchange` and is the only way the Android
 back gesture reaches the game. In a real `standalone` PWA (Finding 0) there is
@@ -751,6 +793,12 @@ background/foreground cycling cannot extend a round — each cycle is billed in
 full on return.
 
 ### A2. The real behavior is the opposite bug: interruptions destroy the round — [code]
+
+> **Status: Done (Session 23), device-verified on the S23 FE.** Both halves
+> of the proposed fix landed: `App.jsx` pauses on `visibilitychange` before a
+> large frame gap can occur (the primary fix, shared with B8 and O21), and
+> `useGameLoop.js` clamps `dtSeconds` to 0.25s as a defensive backstop. See
+> SPEC.md "Round Lifecycle and Input (Session 23)".
 
 The same uncapped `dtSeconds` means that backgrounding for 30 s of a 60 s round
 returns the player to a game that instantly loses 30 seconds — and if the
@@ -1186,3 +1234,21 @@ still open).
 Full detail (root cause, fix, and the tests that prove each fix, including
 tests confirmed to fail without the fix) is in the Session 22 commit message
 (`git show 3efc101`), not duplicated here.
+
+---
+
+# Session 23: Phase 2, lifecycle and input bugs (fixed)
+
+A2, B8, B9, B10, B11, B13, and O21 above are all **Done**, device-verified
+on the S23 FE. Commit 82fd1f2 on `pwa`, merged to `main` in the same state.
+Full detail is in each finding's status blockquote above and in SPEC.md
+"Round Lifecycle and Input (Session 23)"; not duplicated here.
+
+Phase 0's two remaining intentional test failures (A2's `dtSeconds` clamp,
+B9's joystick margin) are now green because the underlying code changed,
+not because the assertions were loosened. The frontend suite has no
+deliberately-failing tests left. See SPEC.md "Testing (frontend)".
+
+Layout and safe-area work (B1, B3, B4, B5, B6) and performance work (O8,
+O10, O11) were explicitly out of scope for this session and remain open,
+Phase 3 and Phase 4 respectively.

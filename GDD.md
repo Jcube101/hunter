@@ -232,10 +232,15 @@ contact. Cornering fish against walls is an intentional and valid strategy.
   organic late-game difficulty increase
 
 ### Count
-| Device | Prey Count |
+| Difficulty | Prey Count |
 |---|---|
-| Mobile (viewport width < 768px) | 30 |
-| Desktop | 50 |
+| Easy | 70 |
+| Normal | 60 |
+| Hardcore | 50 |
+
+Per-difficulty (`FISH_COUNT`), not per-device. See the Difficulty Modes table
+above; the earlier device-based split (mobile 30 / desktop 50) was removed
+once the landscape lock made mobile equivalent to desktop.
 
 Determined once at game start. No respawning. School shrinks as prey are caught.
 
@@ -276,7 +281,9 @@ Never hardcode these values inline anywhere else.
   (0 at center, full SHARK_SPEED at rim).
 - **Joystick parameters:**
   - `JOYSTICK_RADIUS`: 60px
-  - `JOYSTICK_MARGIN`: 40px (from left and bottom edges — was 20px)
+  - `JOYSTICK_MARGIN`: 48px (from left and bottom edges; was 40, originally
+    20; raised in Session 23 so the activation zone clears Android's
+    gesture-navigation edge exclusion, see ROADMAP.md B9)
   - Base ring opacity: 0.4 (was 0.2)
   - Knob opacity: 0.6 (was 0.4)
 - **Speed:** 3.8 px/frame. Faster than prey base speed but not flee speed —
@@ -318,8 +325,16 @@ Never hardcode these values inline anywhere else.
 - Game runs in true fullscreen, landscape locked
 - Android back gesture in fullscreen → intercepted → treated as **Pause**
 - On fullscreen exit (deliberate or system-forced) → game pauses
+- The orientation lock is released on exiting gameplay (Session 23), so it
+  cannot persist onto the start screen or leaderboard
 - If Fullscreen API unavailable (some iOS Safari): graceful fallback — game
   runs without lock, no error shown. "Best in landscape" nudge on start screen.
+- **Standalone (installed) sessions:** pausing does not rely on fullscreen
+  alone. A second, independent `visibilitychange` pause path (Session 23)
+  covers the case where the back gesture backgrounds the app without firing
+  `fullscreenchange`, which is possible once there is no browser chrome to
+  exit. Device-verified on the S23 FE: the back gesture pauses correctly in
+  standalone mode.
 
 ### Input Handling
 - Touch and mouse handled separately — no unified pointer abstraction
